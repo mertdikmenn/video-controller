@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Remote Control</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            width: 200px; /* Fixed width for the popup */
+            padding: 10px;
+            margin: 0;
+            background-color: #282c34; /* Dark background */
+            color: #abb2bf; /* Light text */
+        }
+        h3 {
+            color: #61afef; /* Blue heading */
+            text-align: center;
+            margin-top: 5px;
+            margin-bottom: 15px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 8px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: background-color 0.2s ease;
+        }
+        button:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+        button:disabled {
+            background-color: #444;
+            color: #888;
+            cursor: not-allowed;
+        }
+        #connectBtn {
+            background-color: #50fa7b; /* Green */
+            color: #282c34;
+        }
+        #disconnectBtn {
+            background-color: #ff5555; /* Red */
+            color: #282c34;
+        }
+        #status {
+            font-weight: bold;
+            margin-top: 15px;
+            text-align: center;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .status-connected {
+            color: #50fa7b; /* Green */
+            background-color: rgba(80, 250, 123, 0.1);
+        }
+        .status-disconnected {
+            color: #ff5555; /* Red */
+            background-color: rgba(255, 85, 85, 0.1);
+        }
+        .status-connecting {
+            color: #ffb86c; /* Orange */
+            background-color: rgba(255, 184, 108, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <h3>Relay Connection</h3>
+    <button id="connectBtn">Connect</button>
+    <button id="disconnectBtn">Disconnect</button>
+    <div id="status">Status: Disconnected</div>
+    <script src="popup.js" type="module"></script>
+</body>
+</html>

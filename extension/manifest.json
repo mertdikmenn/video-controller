@@ -1,13 +1,24 @@
 {
-  "manifest_version": 3,
-  "name": "Remote Video Toggle",
-  "version": "0.5.0",
-  "description": "Toggle play/pause of a chosen tab from a phone controller website.",
-  "permissions": ["scripting", "tabs", "storage"],
-  "host_permissions": [
-    "http://localhost:8080/*",
-    "<all_urls>"
-  ],
-  "action": { "default_title": "Set this tab as Player" },
-  "background": { "service_worker": "background.js" }
+    "manifest_version": 3,
+    "name": "Video Remote Control",
+    "version": "0.1",
+    "description": "Receives commands to control video playback.",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage"
+    ],
+    "background": {
+        "service_worker": "src/background.js",
+        "type": "module"
+    },
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        },
+        "default_title": "Video Remote Control"
+    }
 }
