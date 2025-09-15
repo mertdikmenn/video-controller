@@ -1,65 +1,99 @@
 import { MSG_TYPE } from './src/config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    const connectBtn = document.getElementById('connectBtn');
+    // Views
+    const mainView = document.getElementById('main-view');
+    const qrContainer = document.getElementById('qr-container');
+    
+    // Controls
+    const generateBtn = document.getElementById('generateBtn');
     const disconnectBtn = document.getElementById('disconnectBtn');
     const statusDiv = document.getElementById('status');
 
-    /**
-     * Updates the popup's UI based on the connection status.
-     * @param {string} status - The connection status ("connected", "connecting", "disconnected").
-     */
-    function updateStatusUI(status) {
-        // Sanitize status just in case
-        const validStatus = status || 'disconnected';
+    // --- NEW: Store the QRCode instance ---
+    // This allows us to clear it or generate a new code in the same element.
+    let qrCodeInstance = null;
 
+    function updateStatusUI(status) {
+        const validStatus = status || 'disconnected';
         statusDiv.textContent = `Status: ${validStatus.charAt(0).toUpperCase() + validStatus.slice(1)}`;
-        statusDiv.className = ''; // Clear previous classes
+        statusDiv.className = '';
         statusDiv.classList.add(`status-${validStatus}`);
 
-        // Update button states based on the connection status
-        connectBtn.disabled = (validStatus === 'connected' || validStatus === 'connecting');
-        disconnectBtn.disabled = (validStatus === 'disconnected');
+        if (validStatus === 'connected') {
+            mainView.style.display = 'block';
+            qrContainer.style.display = 'none';
+            generateBtn.disabled = true;
+            disconnectBtn.disabled = false;
+            statusDiv.textContent = "Status: Paired & Connected";
+        } else if (validStatus === 'connecting') {
+            mainView.style.display = 'none'; // Hide buttons while waiting for scan
+            qrContainer.style.display = 'block'; // Show QR code
+            generateBtn.disabled = true;
+            disconnectBtn.disabled = true; // Can't disconnect while pairing
+            statusDiv.textContent = "Status: Waiting for remote...";
+        } else { // disconnected
+            mainView.style.display = 'block';
+            qrContainer.style.display = 'none';
+            generateBtn.disabled = false;
+            disconnectBtn.disabled = true;
+        }
     }
 
-    /**
-     * Sends a command to the background service worker.
-     * @param {string} command - The command to send (e.g., MSG_TYPE.CONNECT_RELAY).
-     */
-    function sendCommand(command) {
-        chrome.runtime.sendMessage({ command }, (response) => {
-            // After the command is processed, update the UI with the confirmed status
-            if (chrome.runtime.lastError) {
-                console.error(`Error sending command "${command}":`, chrome.runtime.lastError.message);
-                updateStatusUI('disconnected'); // Assume failure if there's an error
-            } else if (response && response.status) {
-                updateStatusUI(response.status);
+    // --- UPDATED: The showQRCode function ---
+    function showQRCode(token) {
+        mainView.style.display = 'none';
+        qrContainer.style.display = 'block';
+        statusDiv.textContent = "Status: Scan with your phone";
+        
+        // If an instance doesn't exist, create it.
+        if (!qrCodeInstance) {
+            qrCodeInstance = new QRCode(qrContainer, {
+                text: token,
+                width: 160,
+                height: 160,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        } else {
+            // If it already exists, just clear the old code and make a new one.
+            qrCodeInstance.clear();
+            qrCodeInstance.makeCode(token);
+        }
+    }
+
+    // --- EVENT LISTENERS (Unchanged) ---
+    generateBtn.addEventListener('click', () => {
+        statusDiv.textContent = "Status: Generating code...";
+        generateBtn.disabled = true;
+
+        chrome.runtime.sendMessage({ command: MSG_TYPE.START_PAIRING }, (response) => {
+            if (chrome.runtime.lastError || !response.success) {
+                console.error("Pairing failed:", response?.error || chrome.runtime.lastError?.message);
+                updateStatusUI('disconnected');
+                statusDiv.textContent = "Error: Could not get code.";
+            } else {
+                showQRCode(response.token);
             }
         });
-    }
-
-    // --- EVENT LISTENERS ---
-    
-    connectBtn.addEventListener('click', () => {
-        updateStatusUI("connecting");
-        sendCommand(MSG_TYPE.CONNECT_RELAY);
     });
 
     disconnectBtn.addEventListener('click', () => {
-        updateStatusUI("disconnected");
-        sendCommand(MSG_TYPE.DISCONNECT_RELAY)
+        chrome.runtime.sendMessage({ command: MSG_TYPE.DISCONNECT_RELAY });
+        updateStatusUI('disconnected');
     });
 
-    // Listen for real-time status updates from the background script.
-    // This is crucial for when the connection drops while the popup is open.
     chrome.runtime.onMessage.addListener((message) => {
         if (message.type === MSG_TYPE.RELAY_STATUS_UPDATE && message.status) {
             updateStatusUI(message.status);
         }
     });
 
-    // --- INITIALIZATION ---
-
-    // Request the initial status from the background script when the popup opens.
-    sendCommand(MSG_TYPE.GET_RELAY_STATUS);
+    // --- INITIALIZATION (Unchanged) ---
+    chrome.runtime.sendMessage({ command: MSG_TYPE.GET_RELAY_STATUS }, (response) => {
+        if (response && response.status) {
+            updateStatusUI(response.status);
+        }
+    });
 });

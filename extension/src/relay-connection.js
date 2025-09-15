@@ -1,30 +1,34 @@
 import { MSG_TYPE, RECONNECT_DELAY_MS } from './config.js';
 
 export class RelayConnection {
-    constructor(url) {
-        this.url = url;
+    constructor(baseUrl) {
+        this.baseUrl = baseUrl;
+        this.roomID = null;
         this.ws = null;
-        this.status = "disconnected"; // "disconnected", "connecting", "connected"
+        this.status = "disconnected";
         this.isConnecting = false;
         this.reconnectTimeoutId = null;
         this.clientId = Math.random().toString(36).slice(2);
-        this.onMessageCallback = () => {}; // Placeholder for message handler
-        this.onStatusChangeCallback = () => {}; // Placeholder for status change handler
+        this.onMessageCallback = () => {};
+        this.onStatusChangeCallback = () => {};
     }
 
 
     // --- Public Methods ---
 
-    connect() {
+    connect(roomID) {
         if (this.ws || this.isConnecting) {
+            console.warn("[Relay] Connection attempt ignored: already connected or connecting.");
             return;
         }
+        this.roomID = roomID; // Store the roomID for reconnects
         this._doConnect();
     }
 
     disconnect() {
         console.log("[Relay] User initiated disconnect.");
-        this._updateStatus("disconnected"); // Immediately update status
+        this.roomID = null; // Clear the roomID
+        this._updateStatus("disconnected");
         clearTimeout(this.reconnectTimeoutId);
         this.reconnectTimeoutId = null;
         this.isConnecting = false;
@@ -66,12 +70,16 @@ export class RelayConnection {
     }
 
     _doConnect() {
+        if (!this.roomID) {
+            console.error("[Relay] Cannot connect without a roomID.");
+            return;
+        }
         clearTimeout(this.reconnectTimeoutId);
         this.isConnecting = true;
         this._updateStatus("connecting");
 
-        console.log(`[Relay] Attempting to connect to: ${this.url}`);
-        const urlWithParams = `${this.url}?room=${this.roomID}&role=player`;
+        const urlWithParams = `${this.baseUrl}?room=${this.roomID}&role=player`;
+        console.log(`[Relay] Attempting to connect to: ${urlWithParams}`);
         const sock = new WebSocket(urlWithParams);
 
         sock.onopen = () => {
@@ -85,9 +93,8 @@ export class RelayConnection {
         sock.onmessage = (event) => {
             try {
                 const msg = JSON.parse(event.data);
-                if (msg.clientId && msg.clientId === this.clientId)
-                    return;
-                this.onMessageCallback(msg)
+                if (msg.clientId && msg.clientId === this.clientId) return;
+                this.onMessageCallback(msg);
             } catch (e) {
                 console.error("[Relay] Failed to parse message:", event.data);
             }
@@ -109,7 +116,6 @@ export class RelayConnection {
             this.isConnecting = false;
             // onclose will be called next, which handles the state change and reconnect logic.
         };
-
     }
 
 }

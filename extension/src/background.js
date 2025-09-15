@@ -1,13 +1,11 @@
-import { RELAY_URL, MSG_TYPE } from './config.js';
+import { API_GENERATE_TOKEN_URL, WEBSOCKET_URL, MSG_TYPE } from './config.js';
 import { RelayConnection } from './relay-connection.js';
 import { togglePlaybackOnActiveTab } from './player-control.js';
 
 // --- INITIALIZATION ---
-
-const relay = new RelayConnection(RELAY_URL);
+const relay = new RelayConnection(WEBSOCKET_URL);
 
 // --- LOGIC ---
-
 function handleRelayMessage(msg) {
     console.log("[bg] Received message from relay:", msg);
     switch (msg.type) {
@@ -35,21 +33,42 @@ relay.onStatusChange(handleStatusChange);
 
 
 // --- CHROME EVENT LISTENERS ---
-
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.command) {
-        case MSG_TYPE.CONNECT_RELAY:
-            relay.connect();
-            sendResponse({ status: relay.getStatus() });
-            break;
+        case MSG_TYPE.START_PAIRING:
+            // This is an async operation, so we handle the promise
+            (async () => {
+                try {
+                    const response = await fetch(API_GENERATE_TOKEN_URL);
+                    if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+                    
+                    const data = await response.json();
+                    const token = data.token;
+
+                    if (!token) throw new Error("No token received from API");
+
+                    // Connect the relay with the new token
+                    relay.connect(token);
+                    
+                    // Send the token back to the popup so it can render the QR code
+                    sendResponse({ success: true, token: token });
+                } catch (error) {
+                    console.error("Failed to start pairing:", error);
+                    relay.disconnect(); // Ensure we are in a clean state
+                    sendResponse({ success: false, error: error.message });
+                }
+            })();
+            return true; // Required for async sendResponse
+
         case MSG_TYPE.DISCONNECT_RELAY:
             relay.disconnect();
             sendResponse({ status: relay.getStatus() });
             break;
-        case MSG_TYPE.RELAY_STATUS_UPDATE:
+
+        case MSG_TYPE.GET_RELAY_STATUS: // Fixed this from your previous code
             sendResponse({ status: relay.getStatus() });
-            break
+            break;
     }
-    return true
+    return true; // Keep message channel open for async responses
 });
