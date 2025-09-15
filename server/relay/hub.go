@@ -109,6 +109,15 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 			room.Remote = c
 			log.Printf("Remote connected to room: %s", roomID)
 		}
+
+		// Check for successful pairing. If both are now connected, notify them.
+		if room.Player != nil && room.Remote != nil {
+			log.Printf("Pairing complete for room: %s. Notifying clients.", roomID)
+			pairSuccessMsg := []byte(`{"type":"pair_success"}`)
+			// Write in goroutines to avoid blocking
+			go room.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+			go room.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+		}
 		room.mu.Unlock()
 
 		// --- Cleanup logic ---

@@ -14,6 +14,11 @@ function handleRelayMessage(msg) {
                 relay.send({ type: MSG_TYPE.ACK, ok: success, action: "toggled"});
             });
             break;
+        case MSG_TYPE.PAIR_SUCCESS:
+            console.log("[bg] Pairing successful!");
+            // The server has confirmed the remote is connected. Now we are truly "connected".
+            relay._updateStatus("connected"); // We can call the private method here as we are the orchestrator
+            break;
         default:
             console.log(`[bg] Message type is not recognized: ${msg.type}`);
             break;

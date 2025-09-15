@@ -25,25 +25,22 @@ document.addEventListener('DOMContentLoaded', () => {
             generateBtn.disabled = true;
             disconnectBtn.disabled = false;
             statusDiv.textContent = "Status: Paired & Connected";
-        } else if (validStatus === 'connecting') {
-            mainView.style.display = 'none'; // Hide buttons while waiting for scan
-            qrContainer.style.display = 'block'; // Show QR code
-            generateBtn.disabled = true;
-            disconnectBtn.disabled = true; // Can't disconnect while pairing
-            statusDiv.textContent = "Status: Waiting for remote...";
-        } else { // disconnected
+        } else if (validStatus === 'pairing') { // NEW STATE
+            mainView.style.display = 'none';
+            qrContainer.style.display = 'block';
+            disconnectBtn.disabled = false; // Allow user to cancel pairing
+            statusDiv.textContent = "Status: Waiting for scan...";
+            statusDiv.classList.remove('status-pairing'); // Use a different color
+            statusDiv.classList.add('status-connecting'); // Reuse the orange color
+        } else { // disconnected or connecting (before QR)
             mainView.style.display = 'block';
             qrContainer.style.display = 'none';
-            generateBtn.disabled = false;
+            generateBtn.disabled = (validStatus === 'connecting');
             disconnectBtn.disabled = true;
         }
     }
 
     function showQRCode(token) {
-        mainView.style.display = 'none';
-        qrContainer.style.display = 'block';
-        statusDiv.textContent = "Status: Scan with your phone";
-        
         // If an instance doesn't exist, create it.
         if (!qrCodeInstance) {
             qrCodeInstance = new QRCode(qrContainer, {

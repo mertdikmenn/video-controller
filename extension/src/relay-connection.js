@@ -83,10 +83,12 @@ export class RelayConnection {
         const sock = new WebSocket(urlWithParams);
 
         sock.onopen = () => {
-            console.log("[Relay] Connected");
+            console.log("[Relay] WebSocket opened. Waiting for pairing.");
             this.isConnecting = false;
             this.ws = sock;
-            this._updateStatus("connected");
+            // CRITICAL CHANGE: The connection is open, but we are not "Connected" yet.
+            // We are now in a "pairing" state, waiting for the server to confirm.
+            this._updateStatus("pairing"); 
             this.send({ type: MSG_TYPE.IDENTIFY });
         };
 

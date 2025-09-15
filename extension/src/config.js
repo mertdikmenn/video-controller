@@ -9,6 +9,7 @@ export const MSG_TYPE = {
     IDENTIFY: "client-identify",
     TOGGLE: "toggle",
     ACK: "ack",
+    PAIR_SUCCESS: "pair_success",
     START_PAIRING: "startPairing",
     DISCONNECT_RELAY: "disconnectRelay",
     GET_RELAY_STATUS: "getRelayStatus",
