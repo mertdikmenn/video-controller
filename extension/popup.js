@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const disconnectBtn = document.getElementById('disconnectBtn');
     const statusDiv = document.getElementById('status');
 
-    // --- NEW: Store the QRCode instance ---
     // This allows us to clear it or generate a new code in the same element.
     let qrCodeInstance = null;
 
@@ -40,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- UPDATED: The showQRCode function ---
     function showQRCode(token) {
         mainView.style.display = 'none';
         qrContainer.style.display = 'block';
@@ -63,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- EVENT LISTENERS (Unchanged) ---
+    // --- EVENT LISTENERS ---
     generateBtn.addEventListener('click', () => {
         statusDiv.textContent = "Status: Generating code...";
         generateBtn.disabled = true;
@@ -90,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- INITIALIZATION (Unchanged) ---
+    // --- INITIALIZATION ---
     chrome.runtime.sendMessage({ command: MSG_TYPE.GET_RELAY_STATUS }, (response) => {
         if (response && response.status) {
             updateStatusUI(response.status);
