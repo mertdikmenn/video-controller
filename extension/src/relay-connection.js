@@ -71,7 +71,8 @@ export class RelayConnection {
         this._updateStatus("connecting");
 
         console.log(`[Relay] Attempting to connect to: ${this.url}`);
-        const sock = new WebSocket(this.url);
+        const urlWithParams = `${this.url}?room=${this.roomID}&role=player`;
+        const sock = new WebSocket(urlWithParams);
 
         sock.onopen = () => {
             console.log("[Relay] Connected");

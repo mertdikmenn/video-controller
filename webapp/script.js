@@ -3,7 +3,8 @@
 // --- CONFIG & CONSTANTS ---
 // IMPORTANT: Use your actual Cloudflare Tunnel URL here.
 // Use 'wss://' for secure WebSockets, which is required for deployed sites.
-const RELAY_URL = "wss://relay.videocontrol.dev/ws?room=DEMO";
+const roomID = "THE_UUID_FROM_QR_CODE"
+const RELAY_URL = `wss://relay.videocontrol.dev/ws?room=${roomID}&role=remote`;
 
 const MSG_TYPE = {
   TOGGLE: "toggle",
