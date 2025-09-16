@@ -63,6 +63,13 @@ function connect(roomID) {
         }
     };
 
+    ws.onclose = () => {
+        console.log("WebSocket connection closed.");
+        updateStatusUI("disconnected");
+        showView("initial");
+        ws = null;
+    }
+
     ws.onerror = (error) => {
         console.error("WebSocket error:", error);
         updateStatusUI('disconnected', 'Connection Error');
