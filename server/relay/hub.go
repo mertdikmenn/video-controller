@@ -42,6 +42,25 @@ func (h *Hub) getOrCreateRoom(id string) *Room {
 	return h.rooms[id]
 }
 
+// Room cleanup logic
+func (h *Hub) cleanupRoomIfEmpty(roomID string, room *Room) {
+	room.mu.Lock()
+	isPlayerConnected := room.Player != nil
+	isRemoteConnected := room.Remote != nil
+	room.mu.Unlock()
+
+	if !isPlayerConnected && !isRemoteConnected {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+
+		// Double-check in case a new client connected in the meantime
+		if room.Player == nil && room.Remote == nil {
+			delete(h.rooms, roomID)
+			log.Printf("Room empty, deleting room: %s", roomID)
+		}
+	}
+}
+
 // forwardMessage handles forwarding a message from a sender to its paired peer.
 func (h *Hub) forwardMessage(room *Room, sender *websocket.Conn, msg []byte) {
 	room.mu.Lock()
@@ -130,14 +149,9 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 				room.Remote = nil
 				log.Printf("Remote disconnected from room: %s", roomID)
 			}
-
-			if room.Player == nil && room.Remote == nil {
-				h.mu.Lock()
-				delete(h.rooms, roomID)
-				h.mu.Lock()
-				log.Printf("Room empty, deleting room: %s", roomID)
-			}
 			room.mu.Unlock()
+
+			h.cleanupRoomIfEmpty(roomID, room)
 		}()
 
 		// --- Read loop ---
