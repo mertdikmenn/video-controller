@@ -74,3 +74,12 @@ h1 {
 .controls button:active {
     transform: scale(0.97);
 }
+
+#qr-reader {
+    width: 100%;
+    max-width: 300px;
+    margin: 20px auto;
+    border: 2px solid var(--primary-color);
+    border-radius: 10px;
+    overflow: hidden; /* Keeps the video feed inside the rounded corners */
+}

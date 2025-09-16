@@ -1,81 +1,120 @@
-// webapp/script.js
-
-// --- CONFIG & CONSTANTS ---
-// IMPORTANT: Use your actual Cloudflare Tunnel URL here.
-// Use 'wss://' for secure WebSockets, which is required for deployed sites.
-const roomID = "THE_UUID_FROM_QR_CODE"
-const RELAY_URL = `wss://relay.videocontrol.dev/ws?room=${roomID}&role=remote`;
+// --- CONFIG & CONSTANTS
+const WEBSOCKET_BASE_URL = "wss://relay.videocontrol.dev/ws"
 
 const MSG_TYPE = {
-  TOGGLE: "toggle",
-  // We don't need the other types here yet, but it's good practice
-};
+    TOGGLE: "toggle",
+    PAIR_SUCCESS: "pair_success",
+}
 
 // --- DOM ELEMENTS ---
-const statusDiv = document.getElementById('status');
-const toggleBtn = document.getElementById('toggleBtn');
+const statusDiv = document.getElementById("status");
+const initialView = document.getElementById("initial-view");
+const controlsView = document.getElementById("controls");
+const scanBtn = document.getElementById("scanBtn");
+const toggleBtn = document.getElementById("toggleBtn");
+const qrReaderDiv = document.getElementById("qr-reader");
 
 // --- STATE ---
 let ws = null;
+const html5QrCode = new Html5Qrcode("qr-reader");
 
 // --- UI FUNCTIONS ---
-function updateStatusUI(status) {
-    statusDiv.textContent = `Status: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
-    statusDiv.className = ''; // Clear previous classes
+function updateStatusUI(status, message) {
+    statusDiv.textContent = `Status: ${message || status.charAt(0).toUpperCase() + status.slice(1)}`;
+    statusDiv.className = '';
     statusDiv.classList.add(`status-${status}`);
 }
 
-// --- WEBSOCKET LOGIC ---
-function connect() {
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-        console.log("WebSocket is already connected or connecting.");
-        return;
-    }
+function showView(view) {
+    initialView.style.display = 'none';
+    controlsView.style.display = 'none';
+    qrReaderDiv.style.display = 'none';
 
-    updateStatusUI('connecting');
-    console.log("Attempting to connect to relay:", RELAY_URL);
-    ws = new WebSocket(RELAY_URL);
+    if (view == "initial")
+        initialView.style.display = "block";
+    if (view == "controls")
+        controlsView.style.display = "block";
+    if (view == "scanner")
+        qrReaderDiv.style.display = "block";
+}
+
+// --- WEBSOCKET LOGIC ---
+function connect(roomID) {
+    if (ws)
+        return;
+
+    const fullUrl = `${WEBSOCKET_BASE_URL}?room=${roomID}&role=remote`;
+    updateStatusUI("connecting");
+    console.log("Attempting to connect to relay:", fullUrl);
+    ws = new WebSocket(fullUrl);
 
     ws.onopen = () => {
-        console.log("Successfully connected to the relay server!");
-        updateStatusUI('connected');
+        console.log("WebSocket opened. Waiting for pairing confirmation...");
+        // We don't change status to 'connected' here. We wait for the server.
     };
 
     ws.onmessage = (event) => {
-        // We can listen for 'ack' messages from the extension here if we want
-        console.log("Received message from relay:", event.data);
-    };
-
-    ws.onclose = () => {
-        console.log("WebSocket connection closed. Attempting to reconnect...");
-        updateStatusUI('disconnected');
-        ws = null;
-        // Simple exponential backoff could be added here, but for now, a fixed delay is fine.
-        setTimeout(connect, 2000); // Try to reconnect after 2 seconds
+        const msg = JSON.parse(event.data);
+        console.log("Received message:", msg);
+        if (msg.type === MSG_TYPE.PAIR_SUCCESS) {
+            console.log("Pairing successfull!");
+            updateStatusUI('connected', 'Paired & Connected');
+            showView('controls');
+        }
     };
 
     ws.onerror = (error) => {
         console.error("WebSocket error:", error);
-        // The onclose event will be called automatically after an error,
-        // which will trigger the reconnection logic.
-        updateStatusUI('disconnected');
-        ws.close(); // Ensure the socket is closed
+        updateStatusUI('disconnected', 'Connection Error');
+        showView('initial');
+        ws = null;
     };
 }
 
+// --- QR SCANNER LOGIC ---
+const onScanSuccess = (decodedText, decodedResult) => {
+    console.log(`QR Code scanned, token: ${decodedText}`);
+
+    // Stop the camera
+    html5QrCode.stop().then(() => {
+        console.log("QR scanning stopped.");
+        showView('initial'); // Hide the scanner view
+        // Connect to the WebSocket with the scanned token
+        connect(decodedText);
+    }).catch(err => {
+        console.error("Failed to stop QR scanner:", err);
+    });
+};
+
+const onScanFailure = (error) => {
+    // This callback is called frequently, so we don't log anything here
+    // to avoid spamming the console.
+};
+
+const startScanner = () => {
+    showView('scanner');
+    updateStatusUI('connecting', 'Scanning...');
+
+    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    // Use "environment" to prefer the back camera on mobile
+    html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
+        .catch(err => {
+            console.error("Unable to start scanning.", err);
+            updateStatusUI("disconnected", "Camera Error");
+            showView('initial');
+        });
+};
+
 // --- EVENT LISTENERS ---
+scanBtn.addEventListener('click', startScanner);
+
 toggleBtn.addEventListener('click', () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        const message = { type: MSG_TYPE.TOGGLE };
-        console.log("Sending message:", message);
-        ws.send(JSON.stringify(message));
+        ws.send(JSON.stringify({ type: MSG_TYPE.TOGGLE }));
     } else {
         console.warn("Cannot send message, WebSocket is not connected.");
-        // Optionally, you could try to trigger a connection attempt here
-        // connect();
     }
 });
 
 // --- INITIALIZATION ---
-// Start the connection process as soon as the script loads
-connect();
+showView('initial');

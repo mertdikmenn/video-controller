@@ -5,20 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video Remote</title>
     <link rel="stylesheet" href="style.css">
-    <!-- For PWA later: sets the browser chrome color on mobile -->
     <meta name="theme-color" content="#282c34">
 </head>
 <body>
     <div class="container">
         <h1>Video Remote</h1>
         <div id="status" class="status-disconnected">Status: Disconnected</div>
-        <div class="controls">
+
+        <!-- A container for the QR code reader view -->
+        <div id="qr-reader" style="display: none;"></div>
+
+        <!-- The main controls, initially hidden -->
+        <div id="controls" class="controls" style="display: none;">
             <button id="toggleBtn">Toggle Play/Pause</button>
-            <!-- We will add more buttons here later -->
+        </div>
+
+        <!-- The initial connection button -->
+        <div id="initial-view" class="controls">
+            <button id="scanBtn">Scan to Connect</button>
         </div>
     </div>
 
-    <!-- The 'type="module"' is important for using import/export later -->
+    <script src="lib/html5-qrcode.min.js"></script>
     <script src="script.js" type="module"></script>
 </body>
 </html>
