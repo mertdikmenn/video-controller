@@ -28,10 +28,11 @@ function handleRelayMessage(msg) {
                     console.log("[bg] Session token saved.");
                     // Transition to the permanent room using the new token
                     relay.transitionToNewRoom(msg.sessionToken);
-                    // The status will be updated to "connected" by the server's second pair_success
                 });
             } else {
-                // This case handles reconnections to an existing session
+                // This logic handles all subsequent reconnections to an existing session room.
+                // When we successfully connect to the permanent room and the remote joins,
+                // the server sends a pair_success without a token. This is our signal to go "connected".
                 relay._updateStatus("connected");
             }
             break;
