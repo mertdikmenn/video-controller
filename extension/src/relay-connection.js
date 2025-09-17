@@ -38,6 +38,24 @@ export class RelayConnection {
         }
     }
 
+    transitionToNewRoom(newRoomID) {
+        console.log(`[Relay] Transitioning to new room: ${newRoomID}`);
+        // 1. Update the roomID for future automatic reconnections
+        this.roomID = newRoomID;
+
+        // 2. Close the old connection (to the temporary room)
+        if (this.ws) {
+            // We remove the onclose handler temporarily to prevent the
+            // automatic reconnect logic from firing with the OLD roomID.
+            this.ws.onclose = null;
+            this.ws.close();
+            this.ws = null;
+        }
+        
+        // 3. Immediately connect to the new room
+        this._doConnect();
+    }
+
     send(message) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify({ ...message, clientId: this.clientId }));
@@ -106,10 +124,13 @@ export class RelayConnection {
             console.log(`[Relay] Connection closed. Current status: ${this.status}`);
             this.isConnecting = false;
             this.ws = null;
-            if (this.status === "connected" || this.status === "connecting") {
+            // Only try to reconnect if we have a roomID (i.e., not a user-initiated disconnect)
+            if (this.roomID && (this.status === "connected" || this.status === "pairing")) {
                 this._updateStatus("disconnected");
                 console.log(`[Relay] Attempting reconnect in ${RECONNECT_DELAY_MS}ms...`);
                 this.reconnectTimeoutId = setTimeout(() => this._doConnect(), RECONNECT_DELAY_MS);
+            } else {
+                this._updateStatus("disconnected");
             }
         };
 

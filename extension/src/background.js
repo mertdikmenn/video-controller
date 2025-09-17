@@ -2,6 +2,9 @@ import { API_GENERATE_TOKEN_URL, WEBSOCKET_URL, MSG_TYPE } from './config.js';
 import { RelayConnection } from './relay-connection.js';
 import { togglePlaybackOnActiveTab } from './player-control.js';
 
+// --- CONSTANTS ---
+const SESSION_TOKEN_KEY = 'sessionToken';
+
 // --- INITIALIZATION ---
 const relay = new RelayConnection(WEBSOCKET_URL);
 let currentPairingToken = null;
@@ -19,8 +22,18 @@ function handleRelayMessage(msg) {
             console.log("[bg] Pairing successful!");
             currentPairingToken = null; // Clear the token once pairing is done
 
-            // The server has confirmed the remote is connected. Now we are truly "connected".
-            relay._updateStatus("connected"); // We can call the private method here as we are the orchestrator
+            // Handle session token
+            if (msg.sessionToken) {
+                chrome.storage.local.set({ [SESSION_TOKEN_KEY]: msg.sessionToken }, () => {
+                    console.log("[bg] Session token saved.");
+                    // Transition to the permanent room using the new token
+                    relay.transitionToNewRoom(msg.sessionToken);
+                    // The status will be updated to "connected" by the server's second pair_success
+                });
+            } else {
+                // This case handles reconnections to an existing session
+                relay._updateStatus("connected");
+            }
             break;
         default:
             console.log(`[bg] Message type is not recognized: ${msg.type}`);
@@ -73,6 +86,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case MSG_TYPE.DISCONNECT_RELAY:
             currentPairingToken = null; // Clear the token once pairing is done
+            // Also clear the stored session token
+            chrome.storage.local.remove(SESSION_TOKEN_KEY, () => {
+                console.log("[bg] Session token cleared.");
+            });
             relay.disconnect();
             sendResponse({ status: relay.getStatus() });
             break;
@@ -88,4 +105,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
     }
     return true; // Keep message channel open for async responses
+});
+
+// Auto-connect on startup
+chrome.runtime.onStartup.addListener(() => {
+    console.log('[bg] Browser startup detected.')
+    chrome.storage.local.get(SESSION_TOKEN_KEY, (result) => {
+        const token = result[SESSION_TOKEN_KEY];
+        if (token) {
+            console.log(`[bg] Found session token: ${token}. Attempting to reconnect...`);
+            relay.connect(token);
+        } else {
+            console.log('[bg] No session token found.');
+        }
+    });
 });
