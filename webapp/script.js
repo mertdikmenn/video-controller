@@ -1,5 +1,6 @@
 // --- CONFIG & CONSTANTS
 const WEBSOCKET_BASE_URL = "wss://relay.videocontrol.dev/ws"
+const SESSION_TOKEN_KEY = 'sessionToken';
 
 const MSG_TYPE = {
     TOGGLE: "toggle",
