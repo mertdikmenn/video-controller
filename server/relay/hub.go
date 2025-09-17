@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"videocontrol/pairing"
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
@@ -20,14 +21,16 @@ type Room struct {
 
 // Hub manages the collection of active rooms.
 type Hub struct {
-	mu    sync.Mutex
-	rooms map[string]*Room
+	mu           sync.Mutex
+	rooms        map[string]*Room
+	tokenManager *pairing.TokenManager
 }
 
 // NewHub creates a new Hub.
-func NewHub() *Hub {
+func NewHub(tm *pairing.TokenManager) *Hub {
 	return &Hub{
-		rooms: make(map[string]*Room),
+		rooms:        make(map[string]*Room),
+		tokenManager: tm,
 	}
 }
 
@@ -133,22 +136,29 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 
 		// Check for successful pairing. If both are now connected, notify them.
 		if room.Player != nil && room.Remote != nil {
-			log.Printf("Initial pairing complete for temporary room: %s.", roomID)
+			// Check if the roomID is a temporary, valid pairing token
+			if h.tokenManager.ValidateAndClaimToken(roomID) {
+				// This is an INITIAL pairing
+				log.Printf("Initial pairing complete for temporary room: %s.", roomID)
 
-			// 1. Generate a new, permanent session token
-			sessionToken := uuid.NewString()
-			log.Printf("Generated permanent session token: %s", sessionToken)
+				sessionToken := uuid.NewString()
+				log.Printf("Generated permanent session token: %s", sessionToken)
 
-			// 2. Create the new message payload
-			payload := map[string]string{
-				"type":         "pair_success",
-				"sessionToken": sessionToken,
+				payload := map[string]string{
+					"type":         "pair_success",
+					"sessionToken": sessionToken,
+				}
+				pairSuccessMsg, _ := json.Marshal(payload)
+
+				go room.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				go room.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+			} else {
+				// This is a RECONNECTION to a permanent session room
+				log.Printf("Reconnection successful for room: %s. Notifying clients.", roomID)
+				pairSuccessMsg := []byte(`{"type":"pair_success"}`)
+				go room.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				go room.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
 			}
-			pairSuccessMsg, _ := json.Marshal(payload)
-
-			// 3. Notify both clients of the success and provide the new token
-			go room.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
-			go room.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
 		}
 		room.mu.Unlock()
 

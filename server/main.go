@@ -10,7 +10,7 @@ import (
 func main() {
 	// 1. Initialize our modules
 	tokenManager := pairing.NewTokenManager()
-	hub := relay.NewHub()
+	hub := relay.NewHub(tokenManager)
 
 	// 2. Register the HTTP handlers from our modules
 	http.HandleFunc("/api/generate-token", tokenManager.GenerateTokenHandler())
