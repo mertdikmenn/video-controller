@@ -2,11 +2,13 @@ package relay
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"sync"
 
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
 )
 
 // Room holds the two connection roles.
@@ -131,9 +133,20 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 
 		// Check for successful pairing. If both are now connected, notify them.
 		if room.Player != nil && room.Remote != nil {
-			log.Printf("Pairing complete for room: %s. Notifying clients.", roomID)
-			pairSuccessMsg := []byte(`{"type":"pair_success"}`)
-			// Write in goroutines to avoid blocking
+			log.Printf("Initial pairing complete for temporary room: %s.", roomID)
+
+			// 1. Generate a new, permanent session token
+			sessionToken := uuid.NewString()
+			log.Printf("Generated permanent session token: %s", sessionToken)
+
+			// 2. Create the new message payload
+			payload := map[string]string{
+				"type":         "pair_success",
+				"sessionToken": sessionToken,
+			}
+			pairSuccessMsg, _ := json.Marshal(payload)
+
+			// 3. Notify both clients of the success and provide the new token
 			go room.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
 			go room.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
 		}
