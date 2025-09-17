@@ -7,6 +7,7 @@
     --green: #50fa7b;
     --red: #ff5555;
     --orange: #ffb86c;
+    --secondary-color: #444a56;
 }
 
 body {
@@ -56,6 +57,7 @@ h1 {
 .controls button {
     width: 100%;
     padding: 25px;
+    margin-bottom: 15px;
     font-size: 1.5em;
     font-weight: bold;
     border: none;
@@ -74,6 +76,18 @@ h1 {
 .controls button:active {
     transform: scale(0.97);
 }
+
+.controls button.btn-secondary {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    font-size: 1em;
+    padding: 15px;
+}
+
+.controls button.btn-secondary:hover {
+    background-color: #525967;
+}
+
 
 #qr-reader {
     width: 100%;

@@ -39,6 +39,16 @@ function showView(view) {
 }
 
 // --- WEBSOCKET LOGIC ---
+function disconnect() {
+    if (ws) {
+        ws.onclose = null; // Prevent onclose handler from firing
+        ws.close();
+        ws = null;
+    }
+    updateStatusUI("disconnected");
+    showView("initial");
+}
+
 function connect(roomID) {
     if (ws)
         return;
@@ -57,9 +67,20 @@ function connect(roomID) {
         const msg = JSON.parse(event.data);
         console.log("Received message:", msg);
         if (msg.type === MSG_TYPE.PAIR_SUCCESS) {
-            console.log("Pairing successfull!");
-            updateStatusUI('connected', 'Paired & Connected');
-            showView('controls');
+            // This is the INITIAL pairing, server sent us a permanent token
+            if (msg.sessionToken) {
+                console.log("Received session token. Storing and reconnecting...");
+                localStorage.setItem(SESSION_TOKEN_KEY, msg.sessionToken);
+                
+                disconnect();
+                setTimeout(() => connect(msg.sessionToken), 100); // Small delay
+ 
+            } else {
+                // This is a RECONNECTION confirmation
+                console.log("Pairing successfull!");
+                updateStatusUI('connected', 'Paired & Connected');
+                showView('controls');
+            }
         }
     };
 
@@ -68,13 +89,19 @@ function connect(roomID) {
         updateStatusUI("disconnected");
         showView("initial");
         ws = null;
+
+        // Attempt to reconnect if we have a session token
+        const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
+        if (sessionToken) {
+            console.log("Attempting to reconnect to session in 2s...");
+            setTimeout(() => connect(sessionToken), 2000);
+        }
     }
 
     ws.onerror = (error) => {
         console.error("WebSocket error:", error);
         updateStatusUI('disconnected', 'Connection Error');
-        showView('initial');
-        ws = null;
+        // onclose will handle the rest
     };
 }
 
@@ -123,5 +150,23 @@ toggleBtn.addEventListener('click', () => {
     }
 });
 
+disconnectBtn.addEventListener('click', () => {
+    console.log("User initiated disconnect.");
+    localStorage.removeItem(SESSION_TOKEN_KEY);
+    disconnect();
+});
+
+
 // --- INITIALIZATION ---
-showView('initial');
+function initialize() {
+    const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
+    if (sessionToken) {
+        console.log(`Found session token: ${sessionToken}. Connecting...`);
+        connect(sessionToken);
+    } else {
+        console.log("No session token found. Waiting for user to scan.");
+        showView('initial');
+    }
+}
+
+initialize();
