@@ -85,8 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    chrome.storage.local.get
-
     // --- INITIALIZATION ---
     chrome.runtime.sendMessage({ command: MSG_TYPE.GET_RELAY_STATUS }, (response) => {
         if (response && response.status) {
