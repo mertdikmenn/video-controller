@@ -4,6 +4,7 @@ import { togglePlaybackOnActiveTab } from './player-control.js';
 
 // --- INITIALIZATION ---
 const relay = new RelayConnection(WEBSOCKET_URL);
+let currentPairingToken = null;
 
 // --- LOGIC ---
 function handleRelayMessage(msg) {
@@ -16,6 +17,8 @@ function handleRelayMessage(msg) {
             break;
         case MSG_TYPE.PAIR_SUCCESS:
             console.log("[bg] Pairing successful!");
+            currentPairingToken = null; // Clear the token once pairing is done
+
             // The server has confirmed the remote is connected. Now we are truly "connected".
             relay._updateStatus("connected"); // We can call the private method here as we are the orchestrator
             break;
@@ -53,6 +56,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                     if (!token) throw new Error("No token received from API");
 
+                    currentPairingToken = token;
+
                     // Connect the relay with the new token
                     relay.connect(token);
                     
@@ -67,12 +72,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return true; // Required for async sendResponse
 
         case MSG_TYPE.DISCONNECT_RELAY:
+            currentPairingToken = null; // Clear the token once pairing is done
             relay.disconnect();
             sendResponse({ status: relay.getStatus() });
             break;
 
-        case MSG_TYPE.GET_RELAY_STATUS: // Fixed this from your previous code
-            sendResponse({ status: relay.getStatus() });
+        case MSG_TYPE.GET_RELAY_STATUS:
+            // Sends the token along with the status if pairing
+            const status = relay.getStatus();
+            const responsePayload = { status };
+            if (status === "pairing" & currentPairingToken) {
+                responsePayload.token = currentPairingToken;
+            }
+            sendResponse(responsePayload);
             break;
     }
     return true; // Keep message channel open for async responses

@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
             generateBtn.disabled = true;
             disconnectBtn.disabled = false;
             statusDiv.textContent = "Status: Paired & Connected";
-        } else if (validStatus === 'pairing') { // NEW STATE
+        } else if (validStatus === 'pairing') {
             mainView.style.display = 'none';
             qrContainer.style.display = 'block';
             disconnectBtn.disabled = false; // Allow user to cancel pairing
@@ -85,10 +85,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    chrome.storage.local.get
+
     // --- INITIALIZATION ---
     chrome.runtime.sendMessage({ command: MSG_TYPE.GET_RELAY_STATUS }, (response) => {
         if (response && response.status) {
             updateStatusUI(response.status);
+            // If we are in the pairing state, re-render the QR code
+            if (response.status === "pairing" && response.token) {
+                showQRCode(token);
+            }
         }
     });
 });
