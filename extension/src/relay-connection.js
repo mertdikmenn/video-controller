@@ -1,5 +1,9 @@
 import { MSG_TYPE, RECONNECT_DELAY_MS } from './config.js';
 
+// Add a PING message type to the config
+const PING_MSG = JSON.stringify({ type: 'ping' });
+const PING_INTERVAL_MS = 25000; // 25 seconds
+
 export class RelayConnection {
     constructor(baseUrl) {
         this.baseUrl = baseUrl;
@@ -8,11 +12,25 @@ export class RelayConnection {
         this.status = "disconnected";
         this.isConnecting = false;
         this.reconnectTimeoutId = null;
+        this.pingIntervalId = null;
         this.clientId = Math.random().toString(36).slice(2);
         this.onMessageCallback = () => {};
         this.onStatusChangeCallback = () => {};
     }
 
+    _startPing() {
+        this._stopPing();
+        this.pingIntervalId = setInterval(() => {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(PING_MSG)
+            }
+        }, PING_INTERVAL_MS);
+    }
+
+    _stopPing() {
+        clearInterval(this.pingIntervalId);
+        this.pingIntervalId = null;
+    }
 
     // --- Public Methods ---
 
@@ -27,6 +45,7 @@ export class RelayConnection {
 
     disconnect() {
         console.log("[Relay] User initiated disconnect.");
+        this._stopPing();
         this.roomID = null; // Clear the roomID
         this._updateStatus("disconnected");
         clearTimeout(this.reconnectTimeoutId);
@@ -40,6 +59,8 @@ export class RelayConnection {
 
     transitionToNewRoom(newRoomID) {
         console.log(`[Relay] Transitioning to new room: ${newRoomID}`);
+        this._stopPing(); // Stop pinging during transition
+
         // 1. Update the roomID for future automatic reconnections
         this.roomID = newRoomID;
 
@@ -108,6 +129,7 @@ export class RelayConnection {
             // We are now in a "pairing" state, waiting for the server to confirm.
             this._updateStatus("pairing"); 
             this.send({ type: MSG_TYPE.IDENTIFY });
+            this._startPing(); // Start the keepalive ping
         };
 
         sock.onmessage = (event) => {
@@ -123,6 +145,7 @@ export class RelayConnection {
         sock.onclose = () => {
             console.log(`[Relay] Connection closed. Current status: ${this.status}`);
             this.isConnecting = false;
+            this._stopPing(); // Stop pinging when connection closes
             this.ws = null;
             // Only try to reconnect if we have a roomID (i.e., not a user-initiated disconnect)
             if (this.roomID && (this.status === "connected" || this.status === "pairing")) {
