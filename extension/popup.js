@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusDiv.textContent = "Error: Could not get code.";
             } else {
                 showQRCode(response.token);
+                updateStatusUI('pairing');
             }
         });
     });
@@ -91,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatusUI(response.status);
             // If we are in the pairing state, re-render the QR code
             if (response.status === "pairing" && response.token) {
-                showQRCode(token);
+                showQRCode(response.token);
             }
         }
     });

@@ -99,7 +99,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             // Sends the token along with the status if pairing
             const status = relay.getStatus();
             const responsePayload = { status };
-            if (status === "pairing" & currentPairingToken) {
+            if (status === "pairing" && currentPairingToken) {
                 responsePayload.token = currentPairingToken;
             }
             sendResponse(responsePayload);
