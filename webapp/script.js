@@ -141,7 +141,14 @@ const startScanner = () => {
 };
 
 // --- EVENT LISTENERS ---
-scanBtn.addEventListener('click', startScanner);
+scanBtn.addEventListener('click', () => {
+    // Force a clean state before starting a new pairing process.
+    console.log("Starting a new scan. Clearing previous session.");
+    localStorage.removeItem(SESSION_TOKEN_KEY);
+    disconnect(); // This closes any existing WebSocket and resets the UI.
+
+    startScanner();
+});
 
 toggleBtn.addEventListener('click', () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
