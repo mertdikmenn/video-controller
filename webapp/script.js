@@ -13,10 +13,13 @@ const initialView = document.getElementById("initial-view");
 const controlsView = document.getElementById("controls");
 const scanBtn = document.getElementById("scanBtn");
 const toggleBtn = document.getElementById("toggleBtn");
+const disconnectBtn = document.getElementById("disconnectBtn");
+const forgetBtn = document.getElementById("forgetBtn");
 const qrReaderDiv = document.getElementById("qr-reader");
 
 // --- STATE ---
 let ws = null;
+let reconnectTimeoutId = null;
 const html5QrCode = new Html5Qrcode("qr-reader");
 
 // --- UI FUNCTIONS ---
@@ -31,20 +34,33 @@ function showView(view) {
     controlsView.style.display = 'none';
     qrReaderDiv.style.display = 'none';
 
-    if (view == "initial")
+    if (view === "initial") {
         initialView.style.display = "block";
-    if (view == "controls")
-        controlsView.style.display = "block";
-    if (view == "scanner")
-        qrReaderDiv.style.display = "block";
+        // Decide whether to show the scan or forget button
+        const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
+        if (sessionToken && (ws === null || ws.readyState !== WebSocket.OPEN)) {
+            scanBtn.style.display = 'none';
+            forgetBtn.style.display = 'block';
+        } else {
+            scanBtn.style.display = 'block';
+            forgetBtn.style.display = 'none';
+        }
+    }
+    if (view === "controls") controlsView.style.display = "block";
+    if (view === "scanner") qrReaderDiv.style.display = "block";
 }
 
 // --- WEBSOCKET LOGIC ---
-function disconnect() {
+function disconnect(isUserInitiated = false) {
+    clearTimeout(reconnectTimeoutId); // Stop any pending reconnect attempts
     if (ws) {
         ws.onclose = null; // Prevent onclose handler from firing
         ws.close();
         ws = null;
+    }
+    if (isUserInitiated) {
+        localStorage.removeItem(SESSION_TOKEN_KEY);
+        console.log("User initiated disconnect. Session forgotten.");
     }
     updateStatusUI("disconnected");
     showView("initial");
@@ -54,8 +70,10 @@ function connect(roomID) {
     if (ws)
         return;
 
+    clearTimeout(reconnectTimeoutId); // Clear any previous reconnect timers
     const fullUrl = `${WEBSOCKET_BASE_URL}?room=${roomID}&role=remote`;
     updateStatusUI("connecting");
+    showView("initial");
     console.log("Attempting to connect to relay:", fullUrl);
     ws = new WebSocket(fullUrl);
 
@@ -85,17 +103,25 @@ function connect(roomID) {
         }
     };
 
-    ws.onclose = () => {
-        console.log("WebSocket connection closed.");
-        updateStatusUI("disconnected");
-        showView("initial");
+    ws.onclose = (event) => {
+        console.log("WebSocket connection closed.", event.code, event.reason);
         ws = null;
 
-        // Attempt to reconnect if we have a session token
+        // Handle specific close codes from the server
+        if (event.code === 4004 || event.code === 4010) { // Using custom codes for "Not Found" or "Gone"
+            updateStatusUI('disconnected', 'Session expired or not found.');
+            localStorage.removeItem(SESSION_TOKEN_KEY); // The token is invalid, so remove it
+            showView('initial');
+            return; // Do not attempt to reconnect
+        }
+
+        updateStatusUI("disconnected");
+        showView("initial");
+        
         const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
         if (sessionToken) {
             console.log("Attempting to reconnect to session in 2s...");
-            setTimeout(() => connect(sessionToken), 2000);
+            reconnectTimeoutId = setTimeout(() => connect(sessionToken), 2000);
         }
     }
 
@@ -154,7 +180,11 @@ toggleBtn.addEventListener('click', () => {
 disconnectBtn.addEventListener('click', () => {
     console.log("User initiated disconnect.");
     localStorage.removeItem(SESSION_TOKEN_KEY);
-    disconnect();
+    disconnect(true); // User initiated disconnect from controls view
+});
+
+forgetBtn.addEventListener('click', () => {
+    disconnect(true); // User initiated disconnect from initial view
 });
 
 

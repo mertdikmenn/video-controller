@@ -88,6 +88,20 @@ h1 {
     background-color: #525967;
 }
 
+.controls button.btn-link {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    font-size: 0.9em;
+    padding: 10px;
+    text-decoration: underline;
+    margin-top: 10px;
+}
+
+.controls button.btn-link:hover {
+    color: #7ac0f1;
+    background: none; /* Override general button hover */
+}
 
 #qr-reader {
     width: 100%;
