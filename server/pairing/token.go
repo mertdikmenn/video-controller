@@ -51,6 +51,18 @@ func (tm *TokenManager) GenerateToken() string {
 	return tokenID
 }
 
+// Method to check token validity without consuming it.
+func (tm *TokenManager) IsTokenValid(tokenID string) bool {
+	tm.mu.RLock() // Use a read-lock for better concurrency
+	defer tm.mu.RUnlock()
+
+	token, exists := tm.tokens[tokenID]
+	if !exists || time.Now().After(token.ExpiresAt) {
+		return false
+	}
+	return true
+}
+
 // ValidateAndClaimToken checks if a token is valid and removes it to prevent reuse
 func (tm *TokenManager) ValidateAndClaimToken(tokenID string) bool {
 	tm.mu.Lock()

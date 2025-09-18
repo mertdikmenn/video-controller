@@ -6,77 +6,88 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 	"videocontrol/pairing"
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 )
 
-// Room holds the two connection roles.
-type Room struct {
-	mu     sync.Mutex
-	Player *websocket.Conn
-	Remote *websocket.Conn
+const sessionLifetime = 24 * time.Hour     // 24-hour session duration
+const sessionCleanupInterval = time.Minute // How often to check for expired sessions
+
+// Session holds the two connection roles.
+type Session struct {
+	mu        sync.Mutex
+	Player    *websocket.Conn
+	Remote    *websocket.Conn
+	ExpiresAt time.Time
 }
 
 // Hub manages the collection of active rooms.
 type Hub struct {
 	mu           sync.Mutex
-	rooms        map[string]*Room
+	sessions     map[string]*Session
 	tokenManager *pairing.TokenManager
 }
 
 // NewHub creates a new Hub.
 func NewHub(tm *pairing.TokenManager) *Hub {
-	return &Hub{
-		rooms:        make(map[string]*Room),
+	h := &Hub{
+		sessions:     make(map[string]*Session),
 		tokenManager: tm,
 	}
+	go h.cleanupExpiredSessions()
+	return h
 }
 
-// getOrCreateRoom finds a room by ID or creates it if it doesn't exist.
-func (h *Hub) getOrCreateRoom(id string) *Room {
+func (h *Hub) getOrCreateSession(id string) *Session {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if h.rooms[id] == nil {
-		h.rooms[id] = &Room{}
-		log.Printf("Created new room: %s", id)
+	if h.sessions[id] == nil {
+		h.sessions[id] = &Session{}
+		log.Printf("Created new temporary session holder: %s", id)
 	}
 
-	return h.rooms[id]
+	return h.sessions[id]
 }
 
-// Room cleanup logic
-func (h *Hub) cleanupRoomIfEmpty(roomID string, room *Room) {
-	room.mu.Lock()
-	isPlayerConnected := room.Player != nil
-	isRemoteConnected := room.Remote != nil
-	room.mu.Unlock()
+// Goroutine to periodically clean up expired sessions
+func (h *Hub) cleanupExpiredSessions() {
+	ticker := time.NewTicker(sessionCleanupInterval)
+	defer ticker.Stop()
 
-	if !isPlayerConnected && !isRemoteConnected {
+	for range ticker.C {
 		h.mu.Lock()
-		defer h.mu.Unlock()
+		for id, session := range h.sessions {
+			// Check if the session is expired AND no one is connected
+			if time.Now().After(session.ExpiresAt) {
+				session.mu.Lock()
+				playerConnected := session.Player != nil
+				remoteConnected := session.Remote != nil
 
-		// Double-check in case a new client connected in the meantime
-		if room.Player == nil && room.Remote == nil {
-			delete(h.rooms, roomID)
-			log.Printf("Room empty, deleting room: %s", roomID)
+				if !playerConnected && !remoteConnected {
+					log.Printf("Cleaning up expired and empty session: %s", id)
+					delete(h.sessions, id)
+				}
+			}
 		}
+		h.mu.Unlock()
 	}
 }
 
 // forwardMessage handles forwarding a message from a sender to its paired peer.
-func (h *Hub) forwardMessage(room *Room, sender *websocket.Conn, msg []byte) {
-	room.mu.Lock()
-	defer room.mu.Unlock()
+func (h *Hub) forwardMessage(session *Session, sender *websocket.Conn, msg []byte) {
+	session.mu.Lock()
+	defer session.mu.Unlock()
 
 	// Determine the recipient based on the sender
 	var recipient *websocket.Conn
-	if sender == room.Player && room.Remote != nil {
-		recipient = room.Remote
-	} else if sender == room.Remote && room.Player != nil {
-		recipient = room.Player
+	if sender == session.Player && session.Remote != nil {
+		recipient = session.Remote
+	} else if sender == session.Remote && session.Player != nil {
+		recipient = session.Player
 	}
 
 	if recipient != nil {
@@ -93,11 +104,30 @@ func (h *Hub) forwardMessage(room *Room, sender *websocket.Conn, msg []byte) {
 func (h *Hub) ServeWsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
-		roomID := query.Get("room")
+		sessionID := query.Get("room")
 		role := query.Get("role")
 
-		if roomID == "" || (role != "player" && role != "remote") {
-			http.Error(w, "Missing or invalid 'room' or 'role' query parameter", http.StatusBadRequest)
+		if sessionID == "" || (role != "player" && role != "remote") {
+			http.Error(w, "Missing or invalid 'session' or 'role' query parameter", http.StatusBadRequest)
+			return
+		}
+
+		h.mu.Lock()
+		session, exists := h.sessions[sessionID]
+		isTemporaryToken := h.tokenManager.IsTokenValid(sessionID)
+		h.mu.Unlock()
+
+		// If the session exists, check if it's expired
+		if exists && !session.ExpiresAt.IsZero() && time.Now().After(session.ExpiresAt) {
+			log.Printf("Rejecting connection to expired session: %s", sessionID)
+			http.Error(w, "Session expired", http.StatusGone) // 410 Gone
+			return
+		}
+
+		// If it's not an existing session and not a valid temporary token, reject it.
+		if !exists && !isTemporaryToken {
+			log.Printf("Rejecting connection to non-existent session: %s", sessionID)
+			http.Error(w, "Session not found", http.StatusNotFound) // 404 Not Found
 			return
 		}
 
@@ -110,7 +140,7 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 		}
 		defer c.Close(websocket.StatusNormalClosure, "Connection closed.")
 
-		room := h.getOrCreateRoom(roomID)
+		room := h.getOrCreateSession(sessionID)
 
 		// --- Role-based connection logic ---
 		room.mu.Lock()
@@ -122,7 +152,7 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 				return
 			}
 			room.Player = c
-			log.Printf("Player connected to room: %s", roomID)
+			log.Printf("Player connected to room: %s", sessionID)
 		} else { // role == "remote"
 			if room.Remote != nil {
 				// A remote is already connected, reject.
@@ -131,53 +161,67 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 				return
 			}
 			room.Remote = c
-			log.Printf("Remote connected to room: %s", roomID)
+			log.Printf("Remote connected to room: %s", sessionID)
 		}
 
 		// Check for successful pairing. If both are now connected, notify them.
 		if room.Player != nil && room.Remote != nil {
-			// Check if the roomID is a temporary, valid pairing token
-			if h.tokenManager.ValidateAndClaimToken(roomID) {
-				// This is an INITIAL pairing
-				log.Printf("Initial pairing complete for temporary room: %s.", roomID)
+			if h.tokenManager.ValidateAndClaimToken(sessionID) {
+				// Create a permanent session
+				log.Printf("Initial pairing complete for temporary room: %s.", sessionID)
 
-				sessionToken := uuid.NewString()
-				log.Printf("Generated permanent session token: %s", sessionToken)
+				permanentSessionID := uuid.NewString()
+				log.Printf("Generated permanent session ID: %s", permanentSessionID)
 
+				// Create the new permanent session object
+				permanentSession := &Session{
+					ExpiresAt: time.Now().Add(sessionLifetime),
+				}
+				// Move the connections to the new session
+				permanentSession.Player = session.Player
+				permanentSession.Remote = session.Remote
+
+				// Atomically replace the temporary session with the permanent one
+				h.mu.Lock()
+				delete(h.sessions, sessionID) // Delete the old temp holder
+				h.sessions[permanentSessionID] = permanentSession
+				h.mu.Unlock()
+
+				// Notify clients of the new permanent session ID
 				payload := map[string]string{
 					"type":         "pair_success",
-					"sessionToken": sessionToken,
+					"sessionToken": permanentSessionID,
 				}
 				pairSuccessMsg, _ := json.Marshal(payload)
 
-				go room.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
-				go room.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				go permanentSession.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				go permanentSession.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
 			} else {
 				// This is a RECONNECTION to a permanent session room
-				log.Printf("Reconnection successful for room: %s. Notifying clients.", roomID)
+				log.Printf("Reconnection successful for session: %s.", sessionID)
 				pairSuccessMsg := []byte(`{"type":"pair_success"}`)
-				go room.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
-				go room.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				go session.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				go session.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
 			}
 		}
 		room.mu.Unlock()
 
-		// --- Cleanup logic ---
+		// The temporary session holder will be empty and eventually cleaned up if something goes wrong.
 		defer func() {
-			room.mu.Lock()
+			// This logic will apply to whatever session the client is currently in
+			// which will be the permanent one after reconnect.
+			session.mu.Lock()
 			if role == "player" {
-				room.Player = nil
-				log.Printf("Player disconnected from room: %s", roomID)
+				session.Player = nil
+				log.Printf("Player disconnected from session: %s", sessionID)
 			} else {
-				room.Remote = nil
-				log.Printf("Remote disconnected from room: %s", roomID)
+				session.Remote = nil
+				log.Printf("Remote disconnected from session: %s", sessionID)
 			}
-			room.mu.Unlock()
-
-			h.cleanupRoomIfEmpty(roomID, room)
+			session.mu.Unlock()
 		}()
 
-		// --- Read loop ---
+		// Read loop
 		for {
 			_, data, err := c.Read(r.Context())
 			if err != nil {
