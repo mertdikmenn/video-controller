@@ -40,7 +40,7 @@
             background-color: #50fa7b; /* Green */
             color: #282c34;
         }
-        #disconnectBtn {
+        #disconnectBtn, #cancelPairingBtn {
             background-color: #ff5555; /* Red */
             color: #282c34;
         }
@@ -64,7 +64,6 @@
             background-color: rgba(255, 184, 108, 0.1);
         }
         #qr-container {
-            /* This div will now BE the QR code's container */
             margin: 10px auto;
             width: 160px;
             height: 160px;
@@ -73,6 +72,9 @@
         #qr-canvas {
             width: 100% !important;
             height: 100% !important;
+        }
+        #cancel-view {
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -84,6 +86,10 @@
     </div>
 
     <div id="qr-container"></div>
+
+    <div id="cancel-view" style="display: none;">
+        <button id="cancelPairingBtn">Cancel Pairing</button>
+    </div>
 
     <div id="status">Status: Disconnected</div>
 

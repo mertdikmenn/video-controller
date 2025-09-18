@@ -4,13 +4,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Views
     const mainView = document.getElementById('main-view');
     const qrContainer = document.getElementById('qr-container');
+    const cancelView = document.getElementById('cancel-view');
     
     // Controls
     const generateBtn = document.getElementById('generateBtn');
     const disconnectBtn = document.getElementById('disconnectBtn');
+    const cancelPairingBtn = document.getElementById('cancelPairingBtn');
     const statusDiv = document.getElementById('status');
 
-    // This allows us to clear it or generate a new code in the same element.
     let qrCodeInstance = null;
 
     function updateStatusUI(status) {
@@ -19,43 +20,40 @@ document.addEventListener('DOMContentLoaded', () => {
         statusDiv.className = '';
         statusDiv.classList.add(`status-${validStatus}`);
 
+        // Hide all views by default for cleaner state management
+        mainView.style.display = 'none';
+        qrContainer.style.display = 'none';
+        cancelView.style.display = 'none';
+
         if (validStatus === 'connected') {
             mainView.style.display = 'block';
-            qrContainer.style.display = 'none';
             generateBtn.disabled = true;
             disconnectBtn.disabled = false;
             statusDiv.textContent = "Status: Paired & Connected";
         } else if (validStatus === 'pairing') {
-            mainView.style.display = 'none';
             qrContainer.style.display = 'block';
-            disconnectBtn.disabled = false; // Allow user to cancel pairing
+            cancelView.style.display = 'block'; // Show the cancel button
             statusDiv.textContent = "Status: Waiting for scan...";
-            statusDiv.classList.remove('status-pairing'); // Use a different color
-            statusDiv.classList.add('status-connecting'); // Reuse the orange color
+            statusDiv.classList.remove('status-pairing');
+
+            statusDiv.classList.add('status-connecting');
         } else { // disconnected or connecting (before QR)
             mainView.style.display = 'block';
-            qrContainer.style.display = 'none';
             generateBtn.disabled = (validStatus === 'connecting');
             disconnectBtn.disabled = true;
         }
     }
 
     function showQRCode(token) {
-        // If an instance doesn't exist, create it.
-        if (!qrCodeInstance) {
-            qrCodeInstance = new QRCode(qrContainer, {
-                text: token,
-                width: 160,
-                height: 160,
-                colorDark: "#000000",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-            });
-        } else {
-            // If it already exists, just clear the old code and make a new one.
-            qrCodeInstance.clear();
-            qrCodeInstance.makeCode(token);
-        }
+        qrContainer.innerHTML = ''; 
+        qrCodeInstance = new QRCode(qrContainer, {
+            text: token,
+            width: 160,
+            height: 160,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
     }
 
     // --- EVENT LISTENERS ---
@@ -75,10 +73,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    disconnectBtn.addEventListener('click', () => {
+    // This function will be used by both disconnect buttons
+    const handleDisconnect = () => {
         chrome.runtime.sendMessage({ command: MSG_TYPE.DISCONNECT_RELAY });
         updateStatusUI('disconnected');
-    });
+    };
+
+    disconnectBtn.addEventListener('click', handleDisconnect);
+    cancelPairingBtn.addEventListener('click', handleDisconnect);
 
     chrome.runtime.onMessage.addListener((message) => {
         if (message.type === MSG_TYPE.RELAY_STATUS_UPDATE && message.status) {
@@ -88,10 +90,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INITIALIZATION ---
     chrome.runtime.sendMessage({ command: MSG_TYPE.GET_RELAY_STATUS }, (response) => {
+        if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError.message);
+            updateStatusUI('disconnected');
+            return;
+        }
         if (response && response.status) {
             updateStatusUI(response.status);
-            // If we are in the pairing state, re-render the QR code
-            if (response.status === "pairing" && response.token) {
+            if (response.status === 'pairing' && response.token) {
                 showQRCode(response.token);
             }
         }
