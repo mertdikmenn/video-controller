@@ -77,6 +77,13 @@ func (h *Hub) cleanupExpiredSessions() {
 	}
 }
 
+func (h *Hub) getSession(id string) (*Session, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	session, exists := h.sessions[id]
+	return session, exists
+}
+
 // forwardMessage handles forwarding a message from a sender to its paired peer.
 func (h *Hub) forwardMessage(session *Session, sender *websocket.Conn, msg []byte) {
 	session.mu.Lock()
@@ -112,20 +119,31 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 			return
 		}
 
-		h.mu.Lock()
-		session, exists := h.sessions[sessionID]
-		isTemporaryToken := h.tokenManager.IsTokenValid(sessionID)
-		h.mu.Unlock()
+		var session *Session
 
-		// If the session exists, check if it's expired
-		if exists && !session.ExpiresAt.IsZero() && time.Now().After(session.ExpiresAt) {
-			log.Printf("Rejecting connection to expired session: %s", sessionID)
-			http.Error(w, "Session expired", http.StatusGone) // 410 Gone
-			return
-		}
+		existingSession, exists := h.getSession(sessionID)
+		isTempToken := h.tokenManager.IsTokenValid(sessionID)
 
-		// If it's not an existing session and not a valid temporary token, reject it.
-		if !exists && !isTemporaryToken {
+		if exists {
+			// It's an existing session. Check for expiry.
+			if !existingSession.ExpiresAt.IsZero() && time.Now().After(existingSession.ExpiresAt) {
+				log.Printf("Rejecting connection to expired session: %s", sessionID)
+				http.Error(w, "Session expired", http.StatusGone) // 410 Gone
+				return
+			}
+			session = existingSession
+		} else if isTempToken {
+			// It's a new pairing. Create a temporary session holder.
+			h.mu.Lock()
+			// Double check it wasn't created in the meantime
+			if h.sessions[sessionID] == nil {
+				h.sessions[sessionID] = &Session{}
+				log.Printf("Created new temporary session holder: %s", sessionID)
+			}
+			session = h.sessions[sessionID]
+			h.mu.Unlock()
+		} else {
+			// It's not an existing session and not a valid temp token. Reject.
 			log.Printf("Rejecting connection to non-existent session: %s", sessionID)
 			http.Error(w, "Session not found", http.StatusNotFound) // 404 Not Found
 			return
@@ -140,51 +158,46 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 		}
 		defer c.Close(websocket.StatusNormalClosure, "Connection closed.")
 
-		room := h.getOrCreateSession(sessionID)
-
-		// --- Role-based connection logic ---
-		room.mu.Lock()
+		// Role-based connection logic
+		session.mu.Lock()
 		if role == "player" {
-			if room.Player != nil {
+			if session.Player != nil {
 				// A player is already connected, reject this new connection.
-				room.mu.Unlock()
+				session.mu.Unlock()
 				c.Close(websocket.StatusPolicyViolation, "Player already connected to this room.")
 				return
 			}
-			room.Player = c
+			session.Player = c
 			log.Printf("Player connected to room: %s", sessionID)
 		} else { // role == "remote"
-			if room.Remote != nil {
+			if session.Remote != nil {
 				// A remote is already connected, reject.
-				room.mu.Unlock()
+				session.mu.Unlock()
 				c.Close(websocket.StatusPolicyViolation, "Remote already connected to this room.")
 				return
 			}
-			room.Remote = c
+			session.Remote = c
 			log.Printf("Remote connected to room: %s", sessionID)
 		}
 
 		// Check for successful pairing. If both are now connected, notify them.
-		if room.Player != nil && room.Remote != nil {
+		if session.Player != nil && session.Remote != nil {
 			if h.tokenManager.ValidateAndClaimToken(sessionID) {
 				// Create a permanent session
-				log.Printf("Initial pairing complete for temporary room: %s.", sessionID)
-
+				log.Printf("Initial pairing for temporary session: %s.", sessionID)
 				permanentSessionID := uuid.NewString()
 				log.Printf("Generated permanent session ID: %s", permanentSessionID)
 
-				// Create the new permanent session object
-				permanentSession := &Session{
+				// Create the new permanent session "slot"
+				h.mu.Lock()
+				h.sessions[permanentSessionID] = &Session{
 					ExpiresAt: time.Now().Add(sessionLifetime),
 				}
-				// Move the connections to the new session
-				permanentSession.Player = session.Player
-				permanentSession.Remote = session.Remote
+				h.mu.Unlock()
 
-				// Atomically replace the temporary session with the permanent one
+				// Delete the temporary session holder
 				h.mu.Lock()
-				delete(h.sessions, sessionID) // Delete the old temp holder
-				h.sessions[permanentSessionID] = permanentSession
+				delete(h.sessions, sessionID)
 				h.mu.Unlock()
 
 				// Notify clients of the new permanent session ID
@@ -194,8 +207,9 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 				}
 				pairSuccessMsg, _ := json.Marshal(payload)
 
-				go permanentSession.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
-				go permanentSession.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				// Send to the connections which are still technically in the temp session object
+				go session.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				go session.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
 			} else {
 				// This is a RECONNECTION to a permanent session room
 				log.Printf("Reconnection successful for session: %s.", sessionID)
@@ -204,7 +218,7 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 				go session.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
 			}
 		}
-		room.mu.Unlock()
+		session.mu.Unlock()
 
 		// The temporary session holder will be empty and eventually cleaned up if something goes wrong.
 		defer func() {
@@ -227,7 +241,7 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 			if err != nil {
 				break
 			}
-			h.forwardMessage(room, c, data)
+			h.forwardMessage(session, c, data)
 		}
 	}
 }
