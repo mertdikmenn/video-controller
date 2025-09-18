@@ -159,6 +159,7 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 		defer c.Close(websocket.StatusNormalClosure, "Connection closed.")
 
 		// Role-based connection logic
+		var isPairingComplete bool
 		session.mu.Lock()
 		if role == "player" {
 			if session.Player != nil {
@@ -180,23 +181,33 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 			log.Printf("Remote connected to room: %s", sessionID)
 		}
 
+		isPairingComplete = session.Player != nil && session.Remote != nil
+		session.mu.Unlock()
+
 		// Check for successful pairing. If both are now connected, notify them.
-		if session.Player != nil && session.Remote != nil {
+		if isPairingComplete {
 			if h.tokenManager.ValidateAndClaimToken(sessionID) {
 				// Create a permanent session
 				log.Printf("Initial pairing for temporary session: %s.", sessionID)
 				permanentSessionID := uuid.NewString()
 				log.Printf("Generated permanent session ID: %s", permanentSessionID)
 
+				// We need the connection objects from the temporary session
+				session.mu.Lock()
+				playerConn := session.Player
+				remoteConn := session.Remote
+				session.mu.Unlock()
+
 				// Create the new permanent session "slot"
-				h.mu.Lock()
-				h.sessions[permanentSessionID] = &Session{
+				permanentSession := &Session{
 					ExpiresAt: time.Now().Add(sessionLifetime),
+					Player:    playerConn,
+					Remote:    remoteConn,
 				}
-				h.mu.Unlock()
 
 				// Delete the temporary session holder
 				h.mu.Lock()
+				h.sessions[permanentSessionID] = permanentSession
 				delete(h.sessions, sessionID)
 				h.mu.Unlock()
 
@@ -208,17 +219,27 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 				pairSuccessMsg, _ := json.Marshal(payload)
 
 				// Send to the connections which are still technically in the temp session object
-				go session.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
-				go session.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				go playerConn.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				go remoteConn.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+
+				session = permanentSession
 			} else {
 				// This is a RECONNECTION to a permanent session room
 				log.Printf("Reconnection successful for session: %s.", sessionID)
 				pairSuccessMsg := []byte(`{"type":"pair_success"}`)
-				go session.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
-				go session.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				session.mu.Lock()
+				playerConn := session.Player
+				remoteConn := session.Remote
+				session.mu.Unlock()
+
+				if playerConn != nil {
+					go playerConn.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				}
+				if remoteConn != nil {
+					go remoteConn.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+				}
 			}
 		}
-		session.mu.Unlock()
 
 		// The temporary session holder will be empty and eventually cleaned up if something goes wrong.
 		defer func() {
