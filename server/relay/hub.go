@@ -14,9 +14,10 @@ import (
 
 // Room holds the two connection roles.
 type Room struct {
-	mu     sync.Mutex
-	Player *websocket.Conn
-	Remote *websocket.Conn
+	mu          sync.Mutex
+	Player      *websocket.Conn
+	Remote      *websocket.Conn
+	IsTemporary bool
 }
 
 // Hub manages the collection of active rooms.
@@ -40,13 +41,13 @@ func (h *Hub) getRoom(id string) *Room {
 	return h.rooms[id]
 }
 
-func (h *Hub) createRoom(id string) *Room {
+func (h *Hub) createRoom(id string, isTemporary bool) *Room {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	// Double check it doesn't exist to prevent race conditions
 	if h.rooms[id] == nil {
-		h.rooms[id] = &Room{}
-		log.Printf("Created new room: %s", id)
+		h.rooms[id] = &Room{IsTemporary: isTemporary}
+		log.Printf("Created new room: %s (Temporary: %v)", id, isTemporary)
 	}
 	return h.rooms[id]
 }
@@ -113,20 +114,19 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 		defer c.Close(websocket.StatusNormalClosure, "Connection closed.")
 
 		var room *Room
-		isInitialPairing := false
 
 		if role == "player" {
 			// Is this a connection with a fresh, temporary token?
 			if h.tokenManager.ValidateAndClaimToken(roomID) {
-				isInitialPairing = true
-				room = h.createRoom(roomID)
+				// Create a temporary room
+				room = h.createRoom(roomID, true)
 			} else {
 				// This must be a reconnection with a permanent session token.
 				room = h.getRoom(roomID)
 				if room == nil {
 					// This can happen if the remote disconnects first, deleting the room.
 					// So we create it.
-					room = h.createRoom(roomID)
+					room = h.createRoom(roomID, false)
 				}
 			}
 
@@ -160,14 +160,22 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 		// Check for pairing completion
 		room.mu.Lock()
 		if room.Player != nil && room.Remote != nil {
-			if isInitialPairing {
+			if room.IsTemporary {
 				log.Printf("Initial pairing complete for temporary room: %s.", roomID)
+
+				// Generate the session token
 				sessionToken := uuid.NewString()
 				log.Printf("Generated permanent session token: %s", sessionToken)
 				payload := map[string]string{"type": "pair_success", "sessionToken": sessionToken}
 				pairSuccessMsg, _ := json.Marshal(payload)
+
+				// Send the new token to both clients
 				go room.Player.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
 				go room.Remote.Write(context.Background(), websocket.MessageText, pairSuccessMsg)
+
+				// IMPORTANT: Mark this room as no longer temporary so we don't generate
+				// another token if one of the clients disconnects and reconnects quickly.
+				room.IsTemporary = false
 			} else {
 				log.Printf("Reconnection successful for room: %s.", roomID)
 				pairSuccessMsg := []byte(`{"type":"pair_success"}`)
