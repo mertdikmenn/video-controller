@@ -178,8 +178,7 @@ toggleBtn.addEventListener('click', () => {
 
 disconnectBtn.addEventListener('click', () => {
     console.log("User initiated disconnect.");
-    localStorage.removeItem(SESSION_TOKEN_KEY);
-    disconnect();
+    disconnect()
 });
 
 
