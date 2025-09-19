@@ -143,7 +143,7 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 			room = h.getRoom(roomID)
 			if room == nil {
 				log.Printf("Remote connection rejected for room %s: room not found", roomID)
-				c.Close(websocket.StatusPolicyViolation, "Pairing code not found or expired.")
+				c.Close(4001, "Invalid or expired session.")
 				return
 			}
 			room.mu.Lock()

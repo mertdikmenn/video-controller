@@ -13,6 +13,8 @@ const initialView = document.getElementById("initial-view");
 const controlsView = document.getElementById("controls");
 const scanBtn = document.getElementById("scanBtn");
 const toggleBtn = document.getElementById("toggleBtn");
+const disconnectBtn = document.getElementById("disconnectBtn");
+const reconnectBtn = document.getElementById("reconnectBtn");
 const qrReaderDiv = document.getElementById("qr-reader");
 
 // --- STATE ---
@@ -48,6 +50,8 @@ function disconnect() {
     }
     updateStatusUI("disconnected");
     showView("initial");
+    // After disconnecting, re-run initialize to check if we should show the reconnect button
+    initializeUI();
 }
 
 function connect(roomID) {
@@ -85,18 +89,20 @@ function connect(roomID) {
         }
     };
 
-    ws.onclose = () => {
-        console.log("WebSocket connection closed.");
-        updateStatusUI("disconnected");
-        showView("initial");
+    ws.onclose = (event) => {
+        console.log(`WebSocket connection closed. Code: ${event.code}`);
         ws = null;
 
-        // Attempt to reconnect if we have a session token
-        const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
-        if (sessionToken) {
-            console.log("Attempting to reconnect to session in 2s...");
-            setTimeout(() => connect(sessionToken), 2000);
+        if (event.code == 4001) {
+            console.log("Session token is invalid. Clearing it.");
+            localStorage.removeItem(SESSION_TOKEN_KEY);
+            updateStatusUI("disconnected", "Session expired. Please scan again.");
+        } else {
+            updateStatusUI("disconnected");
         }
+
+        showView("initial");
+        initializeUI();
     }
 
     ws.onerror = (error) => {
@@ -150,6 +156,18 @@ scanBtn.addEventListener('click', () => {
     startScanner();
 });
 
+reconnectBtn.addEventListener('click', () => {
+    const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
+    if (sessionToken) {
+        console.log(`Attempting to reconnect with token: ${sessionToken}`);
+        connect(sessionToken);
+    } else {
+        console.warn("Reconnect clicked but no session token found.");
+        // This case is unlikely as the button should be hidden, but it's good practice.
+        initializeUI(); 
+    }
+});
+
 toggleBtn.addEventListener('click', () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: MSG_TYPE.TOGGLE }));
@@ -166,15 +184,16 @@ disconnectBtn.addEventListener('click', () => {
 
 
 // --- INITIALIZATION ---
-function initialize() {
+function initializeUI() {
     const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
     if (sessionToken) {
-        console.log(`Found session token: ${sessionToken}. Connecting...`);
-        connect(sessionToken);
+        console.log(`Found session token: ${sessionToken}. Showing reconnect option.`);
+        reconnectBtn.style.display = 'block';
     } else {
         console.log("No session token found. Waiting for user to scan.");
-        showView('initial');
+        reconnectBtn.style.display = 'none';
     }
+    showView('initial');
 }
 
-initialize();
+initializeUI();
