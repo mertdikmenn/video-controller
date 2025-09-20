@@ -1,5 +1,7 @@
 import { MSG_TYPE } from './src/config.js';
 
+const WEBAPP_URL = "https://app.videocontrol.dev";
+
 document.addEventListener('DOMContentLoaded', () => {
     // Views
     const mainView = document.getElementById('main-view');
@@ -45,9 +47,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showQRCode(token) {
+        const pairingUrl = `${WEBAPP_URL}/?pairToken=${token}`;
+        console.log(`[popup] Generating QR code for URL: ${pairingUrl}`);
+
         qrContainer.innerHTML = ''; 
         qrCodeInstance = new QRCode(qrContainer, {
-            text: token,
+            text: pairingUrl,
             width: 160,
             height: 160,
             colorDark: "#000000",

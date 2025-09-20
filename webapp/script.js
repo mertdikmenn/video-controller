@@ -115,13 +115,27 @@ function connect(roomID) {
 // --- QR SCANNER LOGIC ---
 const onScanSuccess = (decodedText, decodedResult) => {
     console.log(`QR Code scanned, token: ${decodedText}`);
+    let token = decodedText;
+
+    // Handle the case where the scanned content is a full URL
+    try {
+        const url = new URL(decodedText);
+        const pairTokenFromUrl = url.searchParams.get('pairToken');
+        if (pairTokenFromUrl) {
+            console.log("Extracted pairToken from scanned URL.");
+            token = pairTokenFromUrl;
+        }
+    } catch (e) {
+        // Not a valid URL, assume it's a raw token for backward compatibility.
+        console.log("Scanned content is not a URL, treating as raw token.");
+    }
 
     // Stop the camera
     html5QrCode.stop().then(() => {
         console.log("QR scanning stopped.");
         showView('initial'); // Hide the scanner view
         // Connect to the WebSocket with the scanned token
-        connect(decodedText);
+        connect(token);
     }).catch(err => {
         console.error("Failed to stop QR scanner:", err);
     });
@@ -182,6 +196,31 @@ disconnectBtn.addEventListener('click', () => {
 
 
 // --- INITIALIZATION ---
+function cleanUrl() {
+    const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+    window.history.replaceState({ path: newUrl }, '', newUrl);
+}
+
+function initializeApp() {
+    // Priority 1: Check for a new pairing token in the URL.
+    const urlParams = new URLSearchParams(window.location.search);
+    const pairToken = urlParams.get("pairToken");
+
+    if (pairToken) {
+        console.log(`Found pairToken in URL: ${pairToken}. Starting new pairing process.`);
+
+        // Clean the URL so a page refresh doesn't re-trigger the pairing.
+        cleanUrl();
+
+        // Immediately connect with the new token.
+        connect(pairToken);
+        return; // Stop further execution.
+    }
+
+    // Priority 2: No pairToken in the URL, so proceed with the normal UI setup.
+    initializeUI();
+}
+
 function initializeUI() {
     const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
     if (sessionToken) {
@@ -194,4 +233,4 @@ function initializeUI() {
     showView('initial');
 }
 
-initializeUI();
+initializeApp();
