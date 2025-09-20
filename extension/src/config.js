@@ -9,6 +9,7 @@ export const MSG_TYPE = {
     IDENTIFY: "client-identify",
     TOGGLE: "toggle",
     MUTE: "mute",
+    SEEK: "seek",
     ACK: "ack",
     PAIR_SUCCESS: "pair_success",
     START_PAIRING: "startPairing",
