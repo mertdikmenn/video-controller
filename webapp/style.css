@@ -88,7 +88,6 @@ h1 {
     background-color: #525967;
 }
 
-
 #qr-reader {
     width: 100%;
     max-width: 300px;
@@ -96,4 +95,14 @@ h1 {
     border: 2px solid var(--primary-color);
     border-radius: 10px;
     overflow: hidden; /* Keeps the video feed inside the rounded corners */
+}
+
+.seek-controls {
+    display: flex;
+    gap: 15px; /* Adds space between the buttons */
+}
+
+.seek-controls button {
+    font-size: 1.2em;
+    padding: 20px;
 }

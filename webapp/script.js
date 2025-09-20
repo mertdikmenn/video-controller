@@ -5,6 +5,7 @@ const SESSION_TOKEN_KEY = 'sessionToken';
 const MSG_TYPE = {
     TOGGLE: "toggle",
     MUTE: "mute",
+    SEEK: "seek",
     PAIR_SUCCESS: "pair_success",
 }
 
@@ -15,6 +16,8 @@ const controlsView = document.getElementById("controls");
 const scanBtn = document.getElementById("scanBtn");
 const toggleBtn = document.getElementById("toggleBtn");
 const muteBtn = document.getElementById("muteBtn");
+const seekBackwardBtn = document.getElementById("seekBackwardBtn");
+const seekForwardBtn = document.getElementById("seekForwardBtn");
 const disconnectBtn = document.getElementById("disconnectBtn");
 const reconnectBtn = document.getElementById("reconnectBtn");
 const qrReaderDiv = document.getElementById("qr-reader");
@@ -194,6 +197,24 @@ toggleBtn.addEventListener('click', () => {
 muteBtn.addEventListener('click', () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: MSG_TYPE.MUTE }))
+    } else {
+        console.warn("Cannot send message, WebSocket is not connected.");
+    }
+});
+
+seekBackwardBtn.addEventListener('click', () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        // Send the seek command with a negative value
+        ws.send(JSON.stringify({ type: MSG_TYPE.SEEK, value: -10 }));
+    } else {
+        console.warn("Cannot send message, WebSocket is not connected.");
+    }
+});
+
+seekForwardBtn.addEventListener('click', () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        // Send the seek command with a positive value
+        ws.send(JSON.stringify({ type: MSG_TYPE.SEEK, value: 10 }));
     } else {
         console.warn("Cannot send message, WebSocket is not connected.");
     }
