@@ -269,6 +269,9 @@ function initializeApp() {
         // Clean the URL so a page refresh doesn't re-trigger the pairing.
         cleanUrl();
 
+        // This is a new pairing, so clear any old session immediately.
+        localStorage.removeItem(SESSION_TOKEN_KEY);
+
         // Immediately connect with the new token.
         connect(pairToken);
         return; // Stop further execution.
