@@ -106,3 +106,12 @@ h1 {
     font-size: 1.2em;
     padding: 20px;
 }
+
+.volume-control {
+    margin-bottom: 15px;
+}
+
+#volumeSlider {
+    width: 100%;
+    cursor: pointer;
+}

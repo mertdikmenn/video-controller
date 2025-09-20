@@ -6,6 +6,7 @@ const MSG_TYPE = {
     TOGGLE: "toggle",
     MUTE: "mute",
     SEEK: "seek",
+    VOLUME: "volume",
     PAIR_SUCCESS: "pair_success",
 }
 
@@ -18,6 +19,7 @@ const toggleBtn = document.getElementById("toggleBtn");
 const muteBtn = document.getElementById("muteBtn");
 const seekBackwardBtn = document.getElementById("seekBackwardBtn");
 const seekForwardBtn = document.getElementById("seekForwardBtn");
+const volumeSlider = document.getElementById("volumeSlider");
 const disconnectBtn = document.getElementById("disconnectBtn");
 const reconnectBtn = document.getElementById("reconnectBtn");
 const qrReaderDiv = document.getElementById("qr-reader");
@@ -219,6 +221,30 @@ seekForwardBtn.addEventListener('click', () => {
         console.warn("Cannot send message, WebSocket is not connected.");
     }
 });
+
+function throttle(func, limit) {
+    let inThrottle;
+    return function() {
+        const args = arguments;
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    }
+}
+
+function sendVolumeUpdate() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        const volumeLevel = volumeSlider.value / 100;
+        ws.send(JSON.stringify({ type: MSG_TYPE.VOLUME, value: volumeLevel }));
+    } else {
+        console.warn("Cannot send message, WebSocket is not connected.");
+    }
+}
+
+volumeSlider.addEventListener('input', throttle(sendVolumeUpdate, 100)); // Update at most every 100ms
 
 disconnectBtn.addEventListener('click', () => {
     console.log("User initiated disconnect.");
