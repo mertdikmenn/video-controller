@@ -1,6 +1,6 @@
 import { API_GENERATE_TOKEN_URL, WEBSOCKET_URL, MSG_TYPE } from './config.js';
 import { RelayConnection } from './relay-connection.js';
-import { togglePlaybackOnActiveTab, toggleMuteOnActiveTab, seekOnActiveTab } from './player-control.js';
+import { togglePlaybackOnActiveTab, toggleMuteOnActiveTab, seekOnActiveTab, setVolumeOnActiveTab } from './player-control.js';
 
 // --- CONSTANTS ---
 const SESSION_TOKEN_KEY = 'sessionToken';
@@ -27,6 +27,13 @@ function handleRelayMessage(msg) {
             if (typeof msg.value === 'number') {
                 seekOnActiveTab(msg.value).then(success => {
                     relay.send({ type: MSG_TYPE.ACK, ok: success, action: "seeked"});
+                });
+            }
+            break;
+        case MSG_TYPE.VOLUME:
+            if (typeof msg.value === 'number') {
+                setVolumeOnActiveTab(msg.value).then(success => {
+                    // No need to ACK
                 });
             }
             break;

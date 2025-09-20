@@ -10,6 +10,7 @@ export const MSG_TYPE = {
     TOGGLE: "toggle",
     MUTE: "mute",
     SEEK: "seek",
+    VOLUME: "volume",
     ACK: "ack",
     PAIR_SUCCESS: "pair_success",
     START_PAIRING: "startPairing",
