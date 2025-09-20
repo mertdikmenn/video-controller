@@ -8,6 +8,7 @@ export const RECONNECT_DELAY_MS = 2000;
 export const MSG_TYPE = {
     IDENTIFY: "client-identify",
     TOGGLE: "toggle",
+    MUTE: "mute",
     ACK: "ack",
     PAIR_SUCCESS: "pair_success",
     START_PAIRING: "startPairing",

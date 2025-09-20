@@ -1,6 +1,6 @@
 import { API_GENERATE_TOKEN_URL, WEBSOCKET_URL, MSG_TYPE } from './config.js';
 import { RelayConnection } from './relay-connection.js';
-import { togglePlaybackOnActiveTab } from './player-control.js';
+import { togglePlaybackOnActiveTab, toggleMuteOnActiveTab } from './player-control.js';
 
 // --- CONSTANTS ---
 const SESSION_TOKEN_KEY = 'sessionToken';
@@ -16,6 +16,11 @@ function handleRelayMessage(msg) {
         case MSG_TYPE.TOGGLE:
             togglePlaybackOnActiveTab().then(success => {
                 relay.send({ type: MSG_TYPE.ACK, ok: success, action: "toggled"});
+            });
+            break;
+        case MSG_TYPE.MUTE:
+            toggleMuteOnActiveTab().then(success => {
+                relay.send({ type: MSG_TYPE.ACK, ok: success, action: "muted"});
             });
             break;
         case MSG_TYPE.PAIR_SUCCESS:

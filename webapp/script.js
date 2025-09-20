@@ -4,6 +4,7 @@ const SESSION_TOKEN_KEY = 'sessionToken';
 
 const MSG_TYPE = {
     TOGGLE: "toggle",
+    MUTE: "mute",
     PAIR_SUCCESS: "pair_success",
 }
 
@@ -13,6 +14,7 @@ const initialView = document.getElementById("initial-view");
 const controlsView = document.getElementById("controls");
 const scanBtn = document.getElementById("scanBtn");
 const toggleBtn = document.getElementById("toggleBtn");
+const muteBtn = document.getElementById("muteBtn");
 const disconnectBtn = document.getElementById("disconnectBtn");
 const reconnectBtn = document.getElementById("reconnectBtn");
 const qrReaderDiv = document.getElementById("qr-reader");
@@ -184,6 +186,14 @@ reconnectBtn.addEventListener('click', () => {
 toggleBtn.addEventListener('click', () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: MSG_TYPE.TOGGLE }));
+    } else {
+        console.warn("Cannot send message, WebSocket is not connected.");
+    }
+});
+
+muteBtn.addEventListener('click', () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: MSG_TYPE.MUTE }))
     } else {
         console.warn("Cannot send message, WebSocket is not connected.");
     }
