@@ -24,7 +24,7 @@ function handleRelayMessage(msg) {
             });
             break;
         case MSG_TYPE.SEEK:
-            if (typeof message.value === 'number') {
+            if (typeof msg.value === 'number') {
                 seekOnActiveTab(msg.value).then(success => {
                     relay.send({ type: MSG_TYPE.ACK, ok: success, action: "seeked"});
                 });
