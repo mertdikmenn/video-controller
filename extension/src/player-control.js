@@ -125,7 +125,7 @@ function setLargestVideoVolume(level) {
 }
 
 export async function setVolumeOnActiveTab(level) {
-    queryOptions = { active: true, lastFocusedWindow: true };
+    const queryOptions = { active: true, lastFocusedWindow: true };
     const [tab] = await chrome.tabs.query(queryOptions);
 
     if (!tab || !tab.id) {
