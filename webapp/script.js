@@ -137,6 +137,8 @@ const onScanSuccess = (decodedText, decodedResult) => {
         console.log("Scanned content is not a URL, treating as raw token.");
     }
 
+    localStorage.removeItem(SESSION_TOKEN_KEY); 
+
     // Stop the camera
     html5QrCode.stop().then(() => {
         console.log("QR scanning stopped.");
