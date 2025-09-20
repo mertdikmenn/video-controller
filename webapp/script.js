@@ -238,6 +238,7 @@ function throttle(func, limit) {
 }
 
 function sendVolumeUpdate() {
+    console.log("sendVolumeUpdate function was called!");
     if (ws && ws.readyState === WebSocket.OPEN) {
         const volumeLevel = volumeSlider.value / 100;
         ws.send(JSON.stringify({ type: MSG_TYPE.VOLUME, value: volumeLevel }));
