@@ -54,6 +54,48 @@ h1 {
     background-color: rgba(255, 184, 108, 0.1);
 }
 
+/* Base style for buttons in the initial view */
+#initial-view button {
+    width: 100%;
+    padding: 20px;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    font-weight: bold;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.1s ease, background-color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+
+    /* Flexbox for aligning icon and text */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px; /* Space between icon and text */
+}
+
+#initial-view button:active {
+    transform: scale(0.97);
+}
+
+/* Primary "Scan" button style */
+#initial-view #scanBtn {
+    background-color: var(--primary-color);
+    color: var(--bg-color);
+}
+
+#initial-view #scanBtn:hover {
+    background-color: #7ac0f1;
+}
+
+/* Icon sizing for initial view buttons */
+#initial-view button svg {
+    width: 24px;
+    height: 24px;
+    stroke: currentColor;
+    stroke-width: 2.5; /* Slightly thicker stroke for visibility */
+}
+
 .main-controls-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
