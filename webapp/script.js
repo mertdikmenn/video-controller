@@ -29,6 +29,13 @@ let ws = null;
 const html5QrCode = new Html5Qrcode("qr-reader");
 
 // --- UI FUNCTIONS ---
+function triggerHapticFeedback() {
+    if (navigator.vibrate) {
+        // A short, crisp vibration.
+        navigator.vibrate(50); // 50 milliseconds
+    }
+}
+
 function updateStatusUI(status, message) {
     statusDiv.textContent = `Status: ${message || status.charAt(0).toUpperCase() + status.slice(1)}`;
     statusDiv.className = '';
@@ -191,6 +198,7 @@ reconnectBtn.addEventListener('click', () => {
 });
 
 toggleBtn.addEventListener('click', () => {
+    triggerHapticFeedback();
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: MSG_TYPE.TOGGLE }));
     } else {
@@ -199,6 +207,7 @@ toggleBtn.addEventListener('click', () => {
 });
 
 muteBtn.addEventListener('click', () => {
+    triggerHapticFeedback();
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: MSG_TYPE.MUTE }))
     } else {
@@ -207,6 +216,7 @@ muteBtn.addEventListener('click', () => {
 });
 
 seekBackwardBtn.addEventListener('click', () => {
+    triggerHapticFeedback();
     if (ws && ws.readyState === WebSocket.OPEN) {
         // Send the seek command with a negative value
         ws.send(JSON.stringify({ type: MSG_TYPE.SEEK, value: -10 }));
@@ -216,6 +226,7 @@ seekBackwardBtn.addEventListener('click', () => {
 });
 
 seekForwardBtn.addEventListener('click', () => {
+    triggerHapticFeedback();
     if (ws && ws.readyState === WebSocket.OPEN) {
         // Send the seek command with a positive value
         ws.send(JSON.stringify({ type: MSG_TYPE.SEEK, value: 10 }));
