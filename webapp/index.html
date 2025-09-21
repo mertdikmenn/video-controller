@@ -17,16 +17,37 @@
 
         <!-- The main controls, initially hidden -->
         <div id="controls" class="controls" style="display: none;">
-            <button id="toggleBtn">Toggle Play/Pause</button>
-            <button id="muteBtn">Mute / Unmute</button>
+            <!-- Main Controls Grid -->
+            <div class="main-controls-grid">
+                <div></div> <!-- Empty grid cell for spacing -->
+                <button id="muteBtn" aria-label="Mute or Unmute">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-volume-2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                </button>
+                <div></div> <!-- Empty grid cell for spacing -->
+
+                <button id="seekBackwardBtn" aria-label="Seek Backward 10 seconds">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rewind"><polygon points="11 19 2 12 11 5 11 19"></polygon><polygon points="22 19 13 12 22 5 22 19"></polygon></svg>
+                </button>
+
+                <button id="toggleBtn" class="btn-play-pause" aria-label="Toggle Play or Pause">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                </button>
+
+                <button id="seekForwardBtn" aria-label="Seek Forward 10 seconds">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-fast-forward"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
+                </button>
+            </div>
+
+            <!-- Volume Slider -->
             <div class="volume-control">
                 <input type="range" id="volumeSlider" min="0" max="100" value="100" step="1">
             </div>
-            <div class="seek-controls">
-                <button id="seekBackwardBtn">« 10s</button>
-                <button id="seekForwardBtn">10s »</button>
-            </div>
-            <button id="disconnectBtn" class="btn-secondary">Disconnect</button>
+
+            <!-- Disconnect Button -->
+            <button id="disconnectBtn" class="btn-secondary" aria-label="Disconnect Session">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-log-out"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                <span>Disconnect</span>
+            </button>
         </div>
 
         <!-- The initial connection button -->

@@ -54,38 +54,98 @@ h1 {
     background-color: rgba(255, 184, 108, 0.1);
 }
 
-.controls button {
-    width: 100%;
-    padding: 25px;
-    margin-bottom: 15px;
-    font-size: 1.5em;
-    font-weight: bold;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    background-color: var(--primary-color);
-    color: var(--bg-color);
-    transition: transform 0.1s ease, background-color 0.2s ease;
-    -webkit-tap-highlight-color: transparent; /* Removes tap highlight on mobile */
+.main-controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    align-items: center;
+    margin-bottom: 25px;
 }
 
-.controls button:hover {
+/* General style for all icon buttons in the grid */
+.main-controls-grid button {
+    width: 80px;
+    height: 80px;
+    padding: 0; /* Remove padding to rely on flex centering */
+    font-size: 1.5em; /* This is now for fallback text, not the icon */
+    font-weight: bold;
+    border: none;
+    border-radius: 50%; /* Make the buttons circular */
+    cursor: pointer;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    transition: transform 0.1s ease, background-color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    
+    /* Flexbox for perfect icon centering */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    
+    /* Place the button in the center of its grid cell */
+    margin: 0 auto;
+}
+
+.main-controls-grid button:hover {
+    background-color: #525967;
+}
+
+.main-controls-grid button:active {
+    transform: scale(0.95);
+}
+
+/* Style the big, central play/pause button differently */
+.main-controls-grid .btn-play-pause {
+    width: 100px;
+    height: 100px;
+    background-color: var(--primary-color);
+    color: var(--bg-color);
+    grid-row: 2; /* Place it on the second row */
+    grid-column: 2; /* Place it in the middle column */
+}
+
+.main-controls-grid .btn-play-pause:hover {
     background-color: #7ac0f1;
 }
 
-.controls button:active {
-    transform: scale(0.97);
+/* Control the size and color of the SVG icons themselves */
+.controls button svg {
+    width: 45%; /* Size the icon relative to the button size */
+    height: 45%;
+    stroke: currentColor; /* The magic! Icon color will match the button's text color */
+    stroke-width: 2;
 }
 
+/* Update the secondary disconnect button for its icon */
 .controls button.btn-secondary {
+    width: 100%;
     background-color: var(--secondary-color);
     color: var(--text-color);
     font-size: 1em;
     padding: 15px;
+    border-radius: 10px; /* Back to a rectangle */
+    display: flex; /* Use flex to align icon and text */
+    justify-content: center;
+    align-items: center;
+    gap: 10px; /* Space between icon and text */
 }
 
 .controls button.btn-secondary:hover {
     background-color: #525967;
+}
+
+.controls button.btn-secondary svg {
+    width: 20px; /* Fixed size for this button's icon */
+    height: 20px;
+}
+
+.volume-control {
+    margin-bottom: 25px;
+}
+
+#volumeSlider {
+    width: 100%;
+    cursor: pointer;
 }
 
 #qr-reader {
@@ -95,23 +155,4 @@ h1 {
     border: 2px solid var(--primary-color);
     border-radius: 10px;
     overflow: hidden; /* Keeps the video feed inside the rounded corners */
-}
-
-.seek-controls {
-    display: flex;
-    gap: 15px; /* Adds space between the buttons */
-}
-
-.seek-controls button {
-    font-size: 1.2em;
-    padding: 20px;
-}
-
-.volume-control {
-    margin-bottom: 15px;
-}
-
-#volumeSlider {
-    width: 100%;
-    cursor: pointer;
 }
