@@ -1,6 +1,7 @@
 import { API_GENERATE_TOKEN_URL, WEBSOCKET_URL, MSG_TYPE } from './config.js';
 import { RelayConnection } from './relay-connection.js';
 import { togglePlaybackOnActiveTab, toggleMuteOnActiveTab, seekOnActiveTab, setVolumeOnActiveTab } from './player-control.js';
+import { logger } from './logger.js';
 
 // --- CONSTANTS ---
 const SESSION_TOKEN_KEY = 'sessionToken';
@@ -11,7 +12,7 @@ let currentPairingToken = null;
 
 // --- LOGIC ---
 function handleRelayMessage(msg) {
-    console.log("[bg] Received message from relay:", msg);
+    logger.log("[bg] Received message from relay:", msg);
     switch (msg.type) {
         case MSG_TYPE.TOGGLE:
             togglePlaybackOnActiveTab().then(success => {
@@ -38,13 +39,13 @@ function handleRelayMessage(msg) {
             }
             break;
         case MSG_TYPE.PAIR_SUCCESS:
-            console.log("[bg] Pairing successful!");
+            logger.log("[bg] Pairing successful!");
             currentPairingToken = null; // Clear the token once pairing is done
 
             // Handle session token
             if (msg.sessionToken) {
                 chrome.storage.local.set({ [SESSION_TOKEN_KEY]: msg.sessionToken }, () => {
-                    console.log("[bg] Session token saved.");
+                    logger.log("[bg] Session token saved.");
                     // Transition to the permanent room using the new token
                     relay.transitionToNewRoom(msg.sessionToken);
                 });
@@ -56,7 +57,7 @@ function handleRelayMessage(msg) {
             }
             break;
         default:
-            console.log(`[bg] Message type is not recognized: ${msg.type}`);
+            logger.log(`[bg] Message type is not recognized: ${msg.type}`);
             break;
         // Add other commands like 'play', 'pause', 'seek' here in the future
     }
@@ -97,7 +98,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     // Send the token back to the popup so it can render the QR code
                     sendResponse({ success: true, token: token });
                 } catch (error) {
-                    console.error("Failed to start pairing:", error);
+                    logger.error("Failed to start pairing:", error);
                     relay.disconnect(); // Ensure we are in a clean state
                     sendResponse({ success: false, error: error.message });
                 }
@@ -108,7 +109,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             currentPairingToken = null; // Clear the token once pairing is done
             // Also clear the stored session token
             chrome.storage.local.remove(SESSION_TOKEN_KEY, () => {
-                console.log("[bg] Session token cleared.");
+                logger.log("[bg] Session token cleared.");
             });
             relay.disconnect();
             sendResponse({ status: relay.getStatus() });
@@ -129,14 +130,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Auto-connect on startup
 chrome.runtime.onStartup.addListener(() => {
-    console.log('[bg] Browser startup detected.')
+    logger.log('[bg] Browser startup detected.')
     chrome.storage.local.get(SESSION_TOKEN_KEY, (result) => {
         const token = result[SESSION_TOKEN_KEY];
         if (token) {
-            console.log(`[bg] Found session token: ${token}. Attempting to reconnect...`);
+            logger.log(`[bg] Found session token: ${token}. Attempting to reconnect...`);
             relay.connect(token);
         } else {
-            console.log('[bg] No session token found.');
+            logger.log('[bg] No session token found.');
         }
     });
 });

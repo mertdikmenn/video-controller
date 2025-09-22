@@ -1,4 +1,5 @@
 import { MSG_TYPE } from './src/config.js';
+import { logger } from './src/logger.js';
 
 const WEBAPP_URL = "https://app.videocontrol.dev";
 
@@ -48,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showQRCode(token) {
         const pairingUrl = `${WEBAPP_URL}/?pairToken=${token}`;
-        console.log(`[popup] Generating QR code for URL: ${pairingUrl}`);
+        logger.log(`[popup] Generating QR code for URL: ${pairingUrl}`);
 
         qrContainer.innerHTML = ''; 
         qrCodeInstance = new QRCode(qrContainer, {
@@ -68,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         chrome.runtime.sendMessage({ command: MSG_TYPE.START_PAIRING }, (response) => {
             if (chrome.runtime.lastError || !response.success) {
-                console.error("Pairing failed:", response?.error || chrome.runtime.lastError?.message);
+                logger.error("Pairing failed:", response?.error || chrome.runtime.lastError?.message);
                 updateStatusUI('disconnected');
                 statusDiv.textContent = "Error: Could not get code.";
             } else {
@@ -96,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- INITIALIZATION ---
     chrome.runtime.sendMessage({ command: MSG_TYPE.GET_RELAY_STATUS }, (response) => {
         if (chrome.runtime.lastError) {
-            console.error(chrome.runtime.lastError.message);
+            logger.error(chrome.runtime.lastError.message);
             updateStatusUI('disconnected');
             return;
         }

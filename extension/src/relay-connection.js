@@ -1,4 +1,5 @@
 import { MSG_TYPE, RECONNECT_DELAY_MS } from './config.js';
+import { logger } from './logger.js';
 
 // Add a PING message type to the config
 const PING_MSG = JSON.stringify({ type: 'ping' });
@@ -36,7 +37,7 @@ export class RelayConnection {
 
     connect(roomID) {
         if (this.ws || this.isConnecting) {
-            console.warn("[Relay] Connection attempt ignored: already connected or connecting.");
+            logger.warn("[Relay] Connection attempt ignored: already connected or connecting.");
             return;
         }
         this.roomID = roomID; // Store the roomID for reconnects
@@ -44,7 +45,7 @@ export class RelayConnection {
     }
 
     disconnect() {
-        console.log("[Relay] User initiated disconnect.");
+        logger.log("[Relay] User initiated disconnect.");
         this._stopPing();
         this.roomID = null; // Clear the roomID
         this._updateStatus("disconnected");
@@ -58,7 +59,7 @@ export class RelayConnection {
     }
 
     transitionToNewRoom(newRoomID) {
-        console.log(`[Relay] Transitioning to new room: ${newRoomID}`);
+        logger.log(`[Relay] Transitioning to new room: ${newRoomID}`);
         this._stopPing(); // Stop pinging during transition
 
         // 1. Update the roomID for future automatic reconnections
@@ -81,7 +82,7 @@ export class RelayConnection {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify({ ...message, clientId: this.clientId }));
         } else {
-            console.warn("[Relay] Not connected, message not sent:", message);
+            logger.warn("[Relay] Not connected, message not sent:", message);
         }
     }
 
@@ -104,13 +105,13 @@ export class RelayConnection {
             return;
 
         this.status = newStatus;
-        console.log(`[Relay] Status changed to: ${newStatus}`);
+        logger.log(`[Relay] Status changed to: ${newStatus}`);
         this.onStatusChangeCallback(newStatus);
     }
 
     _doConnect() {
         if (!this.roomID) {
-            console.error("[Relay] Cannot connect without a roomID.");
+            logger.error("[Relay] Cannot connect without a roomID.");
             return;
         }
         clearTimeout(this.reconnectTimeoutId);
@@ -118,11 +119,11 @@ export class RelayConnection {
         this._updateStatus("connecting");
 
         const urlWithParams = `${this.baseUrl}?room=${this.roomID}&role=player`;
-        console.log(`[Relay] Attempting to connect to: ${urlWithParams}`);
+        logger.log(`[Relay] Attempting to connect to: ${urlWithParams}`);
         const sock = new WebSocket(urlWithParams);
 
         sock.onopen = () => {
-            console.log("[Relay] WebSocket opened. Waiting for pairing.");
+            logger.log("[Relay] WebSocket opened. Waiting for pairing.");
             this.isConnecting = false;
             this.ws = sock;
             // CRITICAL CHANGE: The connection is open, but we are not "Connected" yet.
@@ -138,19 +139,19 @@ export class RelayConnection {
                 if (msg.clientId && msg.clientId === this.clientId) return;
                 this.onMessageCallback(msg);
             } catch (e) {
-                console.error("[Relay] Failed to parse message:", event.data);
+                logger.error("[Relay] Failed to parse message:", event.data);
             }
         };
 
         sock.onclose = () => {
-            console.log(`[Relay] Connection closed. Current status: ${this.status}`);
+            logger.log(`[Relay] Connection closed. Current status: ${this.status}`);
             this.isConnecting = false;
             this._stopPing(); // Stop pinging when connection closes
             this.ws = null;
             // Only try to reconnect if we have a roomID (i.e., not a user-initiated disconnect)
             if (this.roomID && (this.status === "connected" || this.status === "pairing")) {
                 this._updateStatus("disconnected");
-                console.log(`[Relay] Attempting reconnect in ${RECONNECT_DELAY_MS}ms...`);
+                logger.log(`[Relay] Attempting reconnect in ${RECONNECT_DELAY_MS}ms...`);
                 this.reconnectTimeoutId = setTimeout(() => this._doConnect(), RECONNECT_DELAY_MS);
             } else {
                 this._updateStatus("disconnected");
@@ -158,7 +159,7 @@ export class RelayConnection {
         };
 
         sock.onerror = (error) => {
-            console.error("[Relay] WebSocket error:", error);
+            logger.error("[Relay] WebSocket error:", error);
             this.isConnecting = false;
             // onclose will be called next, which handles the state change and reconnect logic.
         };

@@ -8,12 +8,14 @@ function toggleLargestVideoOrAudio() {
         (b.clientWidth * b.clientHeight) - (a.clientWidth * a.clientHeight))[0];
 
     if (largestMedia.paused) {
-        largestMedia.play().catch((e) => console.log("Play interrupted:", e.message));
+        largestMedia.play().catch(() => {});
     }
     else {
         largestMedia.pause();
     }
 }
+
+import { logger } from './logger.js';
 
 // This function finds the active tab and executes the script.
 export async function togglePlaybackOnActiveTab() {
@@ -21,7 +23,7 @@ export async function togglePlaybackOnActiveTab() {
     const [tab] = await chrome.tabs.query(queryOptions);
 
     if (!tab || !tab.id) {
-        console.warn("[PlayerControl] no active tab found");
+        logger.warn("[PlayerControl] no active tab found");
         return false;
     }
 
@@ -30,10 +32,10 @@ export async function togglePlaybackOnActiveTab() {
             target: { tabId: tab.id, allFrames: true },
             func: toggleLargestVideoOrAudio,
         });
-        console.log(`[PlayerControl] Toggle command sent to tab ${tab.id}`);
+        logger.log(`[PlayerControl] Toggle command sent to tab ${tab.id}`);
         return true
     } catch (error) {
-        console.log(`[PlayerControl] Failed to execute script on tab ${tab.id}`);
+        logger.log(`[PlayerControl] Failed to execute script on tab ${tab.id}`);
         return false
     }
 }
@@ -54,7 +56,7 @@ export async function toggleMuteOnActiveTab() {
     const [tab] = await chrome.tabs.query(queryOptions);
 
     if (!tab || !tab.id) {
-        console.warn("[PlayerControl] no active tab found");
+        logger.warn("[PlayerControl] no active tab found");
         return false;
     }
 
@@ -63,10 +65,10 @@ export async function toggleMuteOnActiveTab() {
             target: { tabId: tab.id, allFrames: true },
             func: toggleMuteLargestVideo,
         });
-        console.log(`[PlayerControl] Mute command sent to tab ${tab.id}`);
+        logger.log(`[PlayerControl] Mute command sent to tab ${tab.id}`);
         return true
     } catch (error) {
-        console.log(`[PlayerControl] Failed to execute mute script on tab ${tab.id}`);
+        logger.log(`[PlayerControl] Failed to execute mute script on tab ${tab.id}`);
         return false
     }
 }
@@ -87,7 +89,7 @@ export async function seekOnActiveTab(seconds) {
     const [tab] = await chrome.tabs.query(queryOptions);
 
     if (!tab || !tab.id) {
-        console.warn("[PlayerControl] no active tab found")
+        logger.warn("[PlayerControl] no active tab found")
         return false;
     }
 
@@ -97,10 +99,10 @@ export async function seekOnActiveTab(seconds) {
             func: seekLargestVideo,
             args: [seconds], // Pass the 'seconds' value here
         });
-        console.log(`[PlayerControl] Seek command (${seconds}s) sent to tab ${tab.id}`);
+        logger.log(`[PlayerControl] Seek command (${seconds}s) sent to tab ${tab.id}`);
         return true
     } catch (error) {
-        console.log(`[PlayerControl] Failed to execute seek script on tab ${tab.id}: ${error}`);
+        logger.log(`[PlayerControl] Failed to execute seek script on tab ${tab.id}: ${error}`);
         return false
     }
 }
@@ -129,7 +131,7 @@ export async function setVolumeOnActiveTab(level) {
     const [tab] = await chrome.tabs.query(queryOptions);
 
     if (!tab || !tab.id) {
-        console.warn("[PlayerControl] no active tab found");
+        logger.warn("[PlayerControl] no active tab found");
         return false;
     }
 
@@ -139,10 +141,10 @@ export async function setVolumeOnActiveTab(level) {
             func: setLargestVideoVolume,
             args: [level],
         });
-        console.log(`[PlayerControl] Volume command (${level}) sent to tab ${tab.id}`);
+        logger.log(`[PlayerControl] Volume command (${level}) sent to tab ${tab.id}`);
         return true
     } catch (error) {
-        console.log(`[PlayerControl] Failed to execute volume script on tab ${tab.id}: ${error}`);
+        logger.log(`[PlayerControl] Failed to execute volume script on tab ${tab.id}: ${error}`);
         return false
     }
 }
