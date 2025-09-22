@@ -91,7 +91,7 @@ func (tm *TokenManager) GenerateTokenHandler() http.HandlerFunc {
 		// Allow requests from any origin (e.g., your Chrome extension)
 		// In a production environment with known origins, you might restrict this.
 		// For an extension, using "*" for Origin is often necessary due to dynamic extension IDs.
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", "https://app.videocontrol.dev")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
