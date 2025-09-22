@@ -1,3 +1,5 @@
+import { logger } from './logger.js';
+
 // --- CONFIG & CONSTANTS
 const WEBSOCKET_BASE_URL = "wss://relay.videocontrol.dev/ws"
 const SESSION_TOKEN_KEY = 'sessionToken';
@@ -74,21 +76,21 @@ function connect(roomID) {
 
     const fullUrl = `${WEBSOCKET_BASE_URL}?room=${roomID}&role=remote`;
     updateStatusUI("connecting");
-    console.log("Attempting to connect to relay:", fullUrl);
+    logger.log("Attempting to connect to relay:", fullUrl);
     ws = new WebSocket(fullUrl);
 
     ws.onopen = () => {
-        console.log("WebSocket opened. Waiting for pairing confirmation...");
+        logger.log("WebSocket opened. Waiting for pairing confirmation...");
         // We don't change status to 'connected' here. We wait for the server.
     };
 
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
-        console.log("Received message:", msg);
+        logger.log("Received message:", msg);
         if (msg.type === MSG_TYPE.PAIR_SUCCESS) {
             // This is the INITIAL pairing, server sent us a permanent token
             if (msg.sessionToken) {
-                console.log("Received session token. Storing and reconnecting...");
+                logger.log("Received session token. Storing and reconnecting...");
                 localStorage.setItem(SESSION_TOKEN_KEY, msg.sessionToken);
                 
                 disconnect();
@@ -96,7 +98,7 @@ function connect(roomID) {
  
             } else {
                 // This is a RECONNECTION confirmation
-                console.log("Pairing successfull!");
+                logger.log("Pairing successfull!");
                 updateStatusUI('connected', 'Paired & Connected');
                 showView('controls');
             }
@@ -104,11 +106,11 @@ function connect(roomID) {
     };
 
     ws.onclose = (event) => {
-        console.log(`WebSocket connection closed. Code: ${event.code}`);
+        logger.log(`WebSocket connection closed. Code: ${event.code}`);
         ws = null;
 
         if (event.code == 4001) {
-            console.log("Session token is invalid. Clearing it.");
+            logger.log("Session token is invalid. Clearing it.");
             localStorage.removeItem(SESSION_TOKEN_KEY);
             updateStatusUI("disconnected", "Session expired. Please scan again.");
         } else {
@@ -120,7 +122,7 @@ function connect(roomID) {
     }
 
     ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
+        logger.error("WebSocket error:", error);
         updateStatusUI('disconnected', 'Connection Error');
         // onclose will handle the rest
     };
@@ -128,7 +130,7 @@ function connect(roomID) {
 
 // --- QR SCANNER LOGIC ---
 const onScanSuccess = (decodedText, decodedResult) => {
-    console.log(`QR Code scanned, token: ${decodedText}`);
+    logger.log(`QR Code scanned, token: ${decodedText}`);
     let token = decodedText;
 
     // Handle the case where the scanned content is a full URL
@@ -136,24 +138,24 @@ const onScanSuccess = (decodedText, decodedResult) => {
         const url = new URL(decodedText);
         const pairTokenFromUrl = url.searchParams.get('pairToken');
         if (pairTokenFromUrl) {
-            console.log("Extracted pairToken from scanned URL.");
+            logger.log("Extracted pairToken from scanned URL.");
             token = pairTokenFromUrl;
         }
     } catch (e) {
         // Not a valid URL, assume it's a raw token for backward compatibility.
-        console.log("Scanned content is not a URL, treating as raw token.");
+        logger.log("Scanned content is not a URL, treating as raw token.");
     }
 
     localStorage.removeItem(SESSION_TOKEN_KEY); 
 
     // Stop the camera
     html5QrCode.stop().then(() => {
-        console.log("QR scanning stopped.");
+        logger.log("QR scanning stopped.");
         showView('initial'); // Hide the scanner view
         // Connect to the WebSocket with the scanned token
         connect(token);
     }).catch(err => {
-        console.error("Failed to stop QR scanner:", err);
+        logger.error("Failed to stop QR scanner:", err);
     });
 };
 
@@ -170,7 +172,7 @@ const startScanner = () => {
     // Use "environment" to prefer the back camera on mobile
     html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
         .catch(err => {
-            console.error("Unable to start scanning.", err);
+            logger.error("Unable to start scanning.", err);
             updateStatusUI("disconnected", "Camera Error");
             showView('initial');
         });
@@ -179,7 +181,7 @@ const startScanner = () => {
 // --- EVENT LISTENERS ---
 scanBtn.addEventListener('click', () => {
     // Force a clean state before starting a new pairing process.
-    console.log("Starting a new scan. Clearing previous session.");
+    logger.log("Starting a new scan. Clearing previous session.");
     disconnect(); // This closes any existing WebSocket and resets the UI.
 
     startScanner();
@@ -188,10 +190,10 @@ scanBtn.addEventListener('click', () => {
 reconnectBtn.addEventListener('click', () => {
     const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
     if (sessionToken) {
-        console.log(`Attempting to reconnect with token: ${sessionToken}`);
+        logger.log(`Attempting to reconnect with token: ${sessionToken}`);
         connect(sessionToken);
     } else {
-        console.warn("Reconnect clicked but no session token found.");
+        logger.warn("Reconnect clicked but no session token found.");
         // This case is unlikely as the button should be hidden, but it's good practice.
         initializeUI(); 
     }
@@ -202,7 +204,7 @@ toggleBtn.addEventListener('click', () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: MSG_TYPE.TOGGLE }));
     } else {
-        console.warn("Cannot send message, WebSocket is not connected.");
+        logger.warn("Cannot send message, WebSocket is not connected.");
     }
 });
 
@@ -211,7 +213,7 @@ muteBtn.addEventListener('click', () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: MSG_TYPE.MUTE }))
     } else {
-        console.warn("Cannot send message, WebSocket is not connected.");
+        logger.warn("Cannot send message, WebSocket is not connected.");
     }
 });
 
@@ -221,7 +223,7 @@ seekBackwardBtn.addEventListener('click', () => {
         // Send the seek command with a negative value
         ws.send(JSON.stringify({ type: MSG_TYPE.SEEK, value: -10 }));
     } else {
-        console.warn("Cannot send message, WebSocket is not connected.");
+        logger.warn("Cannot send message, WebSocket is not connected.");
     }
 });
 
@@ -231,7 +233,7 @@ seekForwardBtn.addEventListener('click', () => {
         // Send the seek command with a positive value
         ws.send(JSON.stringify({ type: MSG_TYPE.SEEK, value: 10 }));
     } else {
-        console.warn("Cannot send message, WebSocket is not connected.");
+        logger.warn("Cannot send message, WebSocket is not connected.");
     }
 });
 
@@ -253,14 +255,14 @@ function sendVolumeUpdate() {
         const volumeLevel = volumeSlider.value / 100;
         ws.send(JSON.stringify({ type: MSG_TYPE.VOLUME, value: volumeLevel }));
     } else {
-        console.warn("Cannot send message, WebSocket is not connected.");
+        logger.warn("Cannot send message, WebSocket is not connected.");
     }
 }
 
 volumeSlider.addEventListener('input', throttle(sendVolumeUpdate, 100)); // Update at most every 100ms
 
 disconnectBtn.addEventListener('click', () => {
-    console.log("User initiated disconnect.");
+    logger.log("User initiated disconnect.");
     disconnect()
 });
 
@@ -277,7 +279,7 @@ function initializeApp() {
     const pairToken = urlParams.get("pairToken");
 
     if (pairToken) {
-        console.log(`Found pairToken in URL: ${pairToken}. Starting new pairing process.`);
+        logger.log(`Found pairToken in URL: ${pairToken}. Starting new pairing process.`);
 
         // Clean the URL so a page refresh doesn't re-trigger the pairing.
         cleanUrl();
@@ -297,10 +299,10 @@ function initializeApp() {
 function initializeUI() {
     const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
     if (sessionToken) {
-        console.log(`Found session token: ${sessionToken}. Showing reconnect option.`);
+        logger.log(`Found session token: ${sessionToken}. Showing reconnect option.`);
         reconnectBtn.style.display = 'block';
     } else {
-        console.log("No session token found. Waiting for user to scan.");
+        logger.log("No session token found. Waiting for user to scan.");
         reconnectBtn.style.display = 'none';
     }
     showView('initial');
