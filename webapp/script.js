@@ -1,5 +1,7 @@
 import { logger } from './logger.js';
 
+document.addEventListener("touchstart", () => {}, true);
+
 // --- CONFIG & CONSTANTS
 const WEBSOCKET_BASE_URL = "wss://relay.videocontrol.dev/ws"
 const SESSION_TOKEN_KEY = 'sessionToken';
@@ -180,6 +182,7 @@ const startScanner = () => {
 
 // --- EVENT LISTENERS ---
 scanBtn.addEventListener('click', () => {
+    triggerHapticFeedback();
     // Force a clean state before starting a new pairing process.
     logger.log("Starting a new scan. Clearing previous session.");
     disconnect(); // This closes any existing WebSocket and resets the UI.
@@ -188,6 +191,7 @@ scanBtn.addEventListener('click', () => {
 });
 
 reconnectBtn.addEventListener('click', () => {
+    triggerHapticFeedback();
     const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
     if (sessionToken) {
         logger.log(`Attempting to reconnect with token: ${sessionToken}`);
@@ -262,6 +266,7 @@ function sendVolumeUpdate() {
 volumeSlider.addEventListener('input', throttle(sendVolumeUpdate, 100)); // Update at most every 100ms
 
 disconnectBtn.addEventListener('click', () => {
+    triggerHapticFeedback();
     logger.log("User initiated disconnect.");
     disconnect()
 });
