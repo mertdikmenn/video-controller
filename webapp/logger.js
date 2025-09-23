@@ -1,6 +1,6 @@
 // --- CONFIGURATION ---
 // Set this to true when you want to "deploy" or stop seeing logs.
-const IS_PRODUCTION = false;
+const IS_PRODUCTION = true;
 
 export const logger = {
   /**
