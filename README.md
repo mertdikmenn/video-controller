@@ -8,13 +8,7 @@ Turn your phone into a secure, real-time remote control for any video playing in
 
 A quick look at the user experience, from pairing to control.
 
-**I recommend you create a short screen recording (GIF) of this entire flow and embed it here. It's incredibly effective.**
-
-If you prefer static images, follow this guide:
-
-| 1. Generate Pairing Code                                                                          | 2. Scan with Your Phone                                                                        | 3. Control the Video                                                                             |
-| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **(ACTION: Take a screenshot of the extension popup showing the QR code)** <br> `[Your Screenshot Here]` | **(ACTION: Take a photo of your phone scanning the QR code on your monitor)** <br> `[Your Screenshot Here]` | **(ACTION: Take a screenshot of the remote web app on your phone)** <br> `[Your Screenshot Here]` |
+![Video Remote Control Demo](.github/assets/demo.gif)
 
 ## Key Features
 
