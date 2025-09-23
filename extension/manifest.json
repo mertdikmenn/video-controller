@@ -1,8 +1,10 @@
 {
     "manifest_version": 3,
     "name": "Video Remote Control",
-    "version": "0.1",
-    "description": "Receives commands to control video playback.",
+    "version": "1.0.0",
+    "description": "Turn your phone into a secure, real-time remote control for any video playing in your browser.",
+    "author": "Mert Dikmen",
+    "homepage_url": "https://github.com/mertdikmenn/video-controller",
     "permissions": [
         "activeTab",
         "scripting",
@@ -23,5 +25,10 @@
             "128": "icons/icon128.png"
         },
         "default_title": "Video Remote Control"
+    },
+    "icons": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
     }
 }
