@@ -10,6 +10,12 @@ const SESSION_TOKEN_KEY = 'sessionToken';
 const relay = new RelayConnection(WEBSOCKET_URL);
 let currentPairingToken = null;
 
+function handleFatalRelayError() {
+    logger.log("[bg] Fatal relay error detected. Clearing session token.");
+    chrome.storage.local.remove(SESSION_TOKEN_KEY);
+    // The relay connection class will handle its own state reset.
+}
+
 // --- LOGIC ---
 function handleRelayMessage(msg) {
     logger.log("[bg] Received message from relay:", msg);
@@ -72,7 +78,7 @@ function handleStatusChange(newStatus) {
 // Wire up the callbacks
 relay.onMessage(handleRelayMessage);
 relay.onStatusChange(handleStatusChange);
-
+relay.onFatalError(handleFatalRelayError);
 
 // --- CHROME EVENT LISTENERS ---
 // Listen for messages from the popup

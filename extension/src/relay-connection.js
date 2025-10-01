@@ -98,6 +98,10 @@ export class RelayConnection {
         this.onStatusChangeCallback = callback;
     }
 
+    onFatalError(callback) {
+        this.onFatalErrorCallback = callback;
+    }
+
     // --- Private Methods ---
 
     _updateStatus(newStatus) {
@@ -120,49 +124,61 @@ export class RelayConnection {
 
         const urlWithParams = `${this.baseUrl}?room=${this.roomID}&role=player`;
         logger.log(`[Relay] Attempting to connect to: ${urlWithParams}`);
-        const sock = new WebSocket(urlWithParams);
 
-        sock.onopen = () => {
-            logger.log("[Relay] WebSocket opened. Waiting for pairing.");
+        try {
+            const sock = new WebSocket(urlWithParams);
+
+            sock.onopen = () => {
+                logger.log("[Relay] WebSocket opened. Waiting for pairing.");
+                this.isConnecting = false;
+                this.ws = sock;
+                // CRITICAL CHANGE: The connection is open, but we are not "Connected" yet.
+                // We are now in a "pairing" state, waiting for the server to confirm.
+                this._updateStatus("pairing"); 
+                this.send({ type: MSG_TYPE.IDENTIFY });
+                this._startPing(); // Start the keepalive ping
+            };
+
+            sock.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.clientId && msg.clientId === this.clientId) return;
+                    this.onMessageCallback(msg);
+                } catch (e) {
+                    logger.error("[Relay] Failed to parse message:", event.data);
+                }
+            };
+
+            sock.onclose = () => {
+                logger.log(`[Relay] Connection closed. Current status: ${this.status}`);
+                this.isConnecting = false;
+                this._stopPing(); // Stop pinging when connection closes
+                this.ws = null;
+                // Only try to reconnect if we have a roomID (i.e., not a user-initiated disconnect)
+                if (this.roomID && (this.status === "connected" || this.status === "pairing")) {
+                    this._updateStatus("disconnected");
+                    logger.log(`[Relay] Attempting reconnect in ${RECONNECT_DELAY_MS}ms...`);
+                    this.reconnectTimeoutId = setTimeout(() => this._doConnect(), RECONNECT_DELAY_MS);
+                } else {
+                    this._updateStatus("disconnected");
+                }
+            };
+
+            sock.onerror = (error) => {
+                logger.error("[Relay] WebSocket error:", error);
+                this.isConnecting = false;
+                // onclose will be called next, which handles the state change and reconnect logic.
+            };
+        } catch (error) {
+            logger.log("[Relay] WebSocket handshake failed. Likely an expired session.", error.message);
             this.isConnecting = false;
-            this.ws = sock;
-            // CRITICAL CHANGE: The connection is open, but we are not "Connected" yet.
-            // We are now in a "pairing" state, waiting for the server to confirm.
-            this._updateStatus("pairing"); 
-            this.send({ type: MSG_TYPE.IDENTIFY });
-            this._startPing(); // Start the keepalive ping
-        };
-
-        sock.onmessage = (event) => {
-            try {
-                const msg = JSON.parse(event.data);
-                if (msg.clientId && msg.clientId === this.clientId) return;
-                this.onMessageCallback(msg);
-            } catch (e) {
-                logger.error("[Relay] Failed to parse message:", event.data);
-            }
-        };
-
-        sock.onclose = () => {
-            logger.log(`[Relay] Connection closed. Current status: ${this.status}`);
-            this.isConnecting = false;
-            this._stopPing(); // Stop pinging when connection closes
-            this.ws = null;
-            // Only try to reconnect if we have a roomID (i.e., not a user-initiated disconnect)
-            if (this.roomID && (this.status === "connected" || this.status === "pairing")) {
-                this._updateStatus("disconnected");
-                logger.log(`[Relay] Attempting reconnect in ${RECONNECT_DELAY_MS}ms...`);
-                this.reconnectTimeoutId = setTimeout(() => this._doConnect(), RECONNECT_DELAY_MS);
-            } else {
-                this._updateStatus("disconnected");
-            }
-        };
-
-        sock.onerror = (error) => {
-            logger.error("[Relay] WebSocket error:", error);
-            this.isConnecting = false;
-            // onclose will be called next, which handles the state change and reconnect logic.
-        };
+            
+            // Signal to background script to clean up the session token
+            this.onFatalErrorCallback();
+            
+            // Perform a clean disconnect on our end
+            this.disconnect();
+        }
     }
 
 }
