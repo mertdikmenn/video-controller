@@ -6,18 +6,23 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 	"videocontrol/pairing"
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 )
 
+const roomExpiryDuration = 24 * time.Hour
+const cleanupInterval = 5 * time.Minute
+
 // Room holds the two connection roles.
 type Room struct {
-	mu          sync.Mutex
-	Player      *websocket.Conn
-	Remote      *websocket.Conn
-	IsTemporary bool
+	mu                 sync.Mutex
+	Player             *websocket.Conn
+	Remote             *websocket.Conn
+	IsTemporary        bool
+	LastDisconnectedAt *time.Time
 }
 
 // Hub manages the collection of active rooms.
@@ -29,10 +34,12 @@ type Hub struct {
 
 // NewHub creates a new Hub.
 func NewHub(tm *pairing.TokenManager) *Hub {
-	return &Hub{
+	h := &Hub{
 		rooms:        make(map[string]*Room),
 		tokenManager: tm,
 	}
+	go h.cleanupExpiredRooms()
+	return h
 }
 
 func (h *Hub) getRoom(id string) *Room {
@@ -52,21 +59,41 @@ func (h *Hub) createRoom(id string, isTemporary bool) *Room {
 	return h.rooms[id]
 }
 
-// Room cleanup logic
-func (h *Hub) cleanupRoomIfEmpty(roomID string, room *Room) {
-	room.mu.Lock()
-	isPlayerConnected := room.Player != nil
-	isRemoteConnected := room.Remote != nil
-	room.mu.Unlock()
+// Background process to clean up expired rooms.
+func (h *Hub) cleanupExpiredRooms() {
+	ticker := time.NewTicker(cleanupInterval)
+	defer ticker.Stop()
 
-	if !isPlayerConnected && !isRemoteConnected {
+	for range ticker.C {
+		roomsToDelete := []string{}
+
+		// First, identify which rooms to delete without holding the hub lock for too long.
 		h.mu.Lock()
-		defer h.mu.Unlock()
+		for id, room := range h.rooms {
+			room.mu.Lock()
+			// Check if the room is empty and has been for longer than the expiry duration.
+			if room.LastDisconnectedAt != nil && time.Since(*room.LastDisconnectedAt) > roomExpiryDuration {
+				roomsToDelete = append(roomsToDelete, id)
+			}
+			room.mu.Unlock()
+		}
+		h.mu.Unlock()
 
-		// Double-check in case a new client connected in the meantime
-		if room.Player == nil && room.Remote == nil {
-			delete(h.rooms, roomID)
-			log.Printf("Room empty, deleting room: %s", roomID)
+		// Now, perform the deletion of the identified rooms.
+		if len(roomsToDelete) > 0 {
+			h.mu.Lock()
+			for _, id := range roomsToDelete {
+				// Double-check the room wasn't re-activated while we weren't looking.
+				if room, ok := h.rooms[id]; ok {
+					room.mu.Lock()
+					if room.LastDisconnectedAt != nil && time.Since(*room.LastDisconnectedAt) > roomExpiryDuration {
+						delete(h.rooms, id)
+						log.Printf("Cleaned up expired room: %s", id)
+					}
+					room.mu.Unlock()
+				}
+			}
+			h.mu.Unlock()
 		}
 	}
 }
@@ -137,6 +164,7 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 				return
 			}
 			room.Player = c
+			room.LastDisconnectedAt = nil // Mark room as active
 			log.Printf("Player connected to room: %s", roomID)
 			room.mu.Unlock()
 		} else { // role == "remote"
@@ -153,6 +181,7 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 				return
 			}
 			room.Remote = c
+			room.LastDisconnectedAt = nil // Mark room as active
 			log.Printf("Remote connected to room: %s", roomID)
 			room.mu.Unlock()
 		}
@@ -188,6 +217,7 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 		// Defer and read loop
 		defer func() {
 			room.mu.Lock()
+			isTemporaryBeforeDisconnect := room.IsTemporary
 			if role == "player" {
 				room.Player = nil
 				log.Printf("Player disconnected from room: %s", roomID)
@@ -195,8 +225,23 @@ func (h *Hub) ServeWsHandler() http.HandlerFunc {
 				room.Remote = nil
 				log.Printf("Remote disconnected from room: %s", roomID)
 			}
+
+			// If the room is now empty, start the expiration timer (if it's a permanent room)
+			if room.Player == nil && room.Remote == nil && !isTemporaryBeforeDisconnect {
+				log.Printf("Room is empty, starting 24h expiration timer: %s", roomID)
+				now := time.Now()
+				room.LastDisconnectedAt = &now
+			}
 			room.mu.Unlock()
-			h.cleanupRoomIfEmpty(roomID, room)
+
+			// If the room was temporary and is now empty, clean it up immediately.
+			// This handles cases where a user generates a QR code but never scans it.
+			if isTemporaryBeforeDisconnect && room.Player == nil && room.Remote == nil {
+				h.mu.Lock()
+				delete(h.rooms, roomID)
+				log.Printf("Abandoned temporary room %s deleted.", roomID)
+				h.mu.Unlock()
+			}
 		}()
 
 		for {
